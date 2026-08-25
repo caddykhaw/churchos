@@ -1,0 +1,89 @@
+# docker-compose.yml — ChurchOS local Supabase stack
+# Plan: docs/superpowers/plans/2026-08-24-foundation-infrastructure.md §Task 2
+#
+# Port mapping (deviated from plan to avoid collisions with existing services on this host):
+#   plan:  5432 / 3000 / 3001 / 80
+#   used:  35432 / 38080 / 33001 / 8088
+#
+# Update NUXT_PUBLIC_SUPABASE_URL etc. in .env to match (e.g. http://localhost:38080)
+services:
+  db:
+    image: supabase/postgres:15.6.1.146  # plan: 15.6.1.147 (gone from Docker Hub, last available)
+    container_name: churchos-db
+    restart: unless-stopped
+    ports:
+      - "35432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres -h localhost
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rest:
+    image: postgrest/postgrest:v12.0.2
+    container_name: churchos-rest
+    # PostgREST calls getpwuid() on its runtime UID and the DB role's UID, but the
+    # alpine image has no /etc/passwd entries for these. Bind-mount proper passwd/group
+    # so the UID lookups succeed (errors: "could not look up local user ID 1000/0").
+    user: "1000:1000"
+    volumes:
+      - ./passwd:/etc/passwd:ro
+      - ./group:/etc/group:ro
+    restart: unless-stopped
+    ports:
+      - "38080:3000"
+    environment:
+      # URL-encode the password (base64 contains / and = which break the URI)
+      PGRST_DB_URI: "postgres://postgres:${POSTGRES_PASSWORD_ENCODED}@db:5432/postgres"
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  studio:
+    # Use latest tag (the plan's 20240729-15e7a36 is from 2024 and lacks modern env wiring)
+    image: supabase/studio:latest
+    container_name: churchos-studio
+    restart: unless-stopped
+    ports:
+      - "33001:3000"
+    environment:
+      SUPABASE_URL: http://rest:3000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      # Required for studio to talk to db directly
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+
+  nginx:
+    image: nginx:alpine
+    container_name: churchos-nginx
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - rest
+
+volumes:
+  db-data:
