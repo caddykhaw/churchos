@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+.nuxt/
+.output/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+.worktrees/
+.wrangler/
+.firebase/
+.vscode/
+.idea/
+
+# Hermes status files for agent coordination
+.hermes/
