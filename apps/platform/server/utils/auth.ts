@@ -1,0 +1,58 @@
+import type { H3Event } from 'h3'
+import type { Role } from '@churchos/database'
+
+export function requireAuth(event: H3Event) {
+  if (!event.context.user) {
+    throw createError({
+      statusCode: 401,
+      message: 'Authentication required'
+    })
+  }
+  return event.context.user
+}
+
+export function requireOrg(event: H3Event) {
+  requireAuth(event)
+
+  if (!event.context.org) {
+    throw createError({
+      statusCode: 400,
+      message: 'Organization context required'
+    })
+  }
+
+  return event.context.org
+}
+
+export function requireRole(event: H3Event, role: Role) {
+  const org = requireOrg(event)
+
+  if (!org.userRoles.includes(role)) {
+    throw createError({
+      statusCode: 403,
+      message: `Role '${role}' required`
+    })
+  }
+}
+
+export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pages') {
+  const org = requireOrg(event)
+
+  if (org.subscription_status === 'trial') {
+    return
+  }
+
+  if (org.subscription_status === 'suspended') {
+    throw createError({
+      statusCode: 402,
+      message: 'Subscription suspended. Please contact support.'
+    })
+  }
+
+  if (!org.subscribedModules.includes(module)) {
+    throw createError({
+      statusCode: 403,
+      message: `Module '${module}' not included in your subscription`
+    })
+  }
+}
