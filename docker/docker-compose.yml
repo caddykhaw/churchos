@@ -64,9 +64,9 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: postgres
     healthcheck:
-      test: wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1
+      test: ["CMD", "node", "-e", "a=require('os').networkInterfaces(),ip=Object.values(a).flat().find(i=>i&&i.family==='IPv4'&&!i.internal)?.address;require('http').get('http://'+ip+':3000/project/default',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     depends_on:
       db:
