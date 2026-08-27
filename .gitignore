@@ -16,3 +16,6 @@ dist/
 # Hermes status files for agent coordination
 .hermes/
 docker/.env
+
+# Analysis output
+graphify-out/
