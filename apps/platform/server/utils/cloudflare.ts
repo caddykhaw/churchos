@@ -1,6 +1,6 @@
 const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4'
 const CHURCHOS_DOMAIN = 'churchos.my'
-const CNAME_TARGET = 'churchos.my'
+const CNAME_TARGET = 'app.churchos.my'
 const SUBDOMAIN_SLUG_PATTERN = /^(?=.{3,30}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/
 const RESERVED_SUBDOMAINS = new Set(['app', 'www', 'localhost'])
 

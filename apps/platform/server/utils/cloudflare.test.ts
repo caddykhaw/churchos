@@ -78,7 +78,7 @@ describe('Cloudflare DNS provisioning', () => {
         body: JSON.stringify({
           type: 'CNAME',
           name: 'grace-church.churchos.my',
-          content: 'churchos.my',
+          content: 'app.churchos.my',
           ttl: 3600,
           proxied: true
         })
@@ -113,7 +113,7 @@ describe('Cloudflare DNS provisioning', () => {
           id: 'record-id',
           type: 'CNAME',
           name: 'grace-church.churchos.my',
-          content: 'churchos.my'
+          content: 'app.churchos.my'
         }]
       }))
       .mockResolvedValueOnce(cloudflareResponse({ success: true, result: {} }))
