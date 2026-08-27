@@ -20,6 +20,13 @@ function cloudflareResponse(body: unknown, status = 200): Response {
 describe('Cloudflare DNS provisioning', () => {
   beforeEach(() => {
     vi.stubGlobal('useRuntimeConfig', () => runtimeConfig)
+    vi.stubGlobal('process', {
+      ...process,
+      env: {
+        ...process.env,
+        CLOUDFLARE_EMAIL: 'test@example.com'
+      }
+    })
     vi.stubGlobal('createError', ({ message, statusCode }: { message: string, statusCode: number }) => {
       const error = new Error(message) as Error & { statusCode: number }
       error.statusCode = statusCode
@@ -64,13 +71,14 @@ describe('Cloudflare DNS provisioning', () => {
       expect.objectContaining({
         method: 'POST',
         headers: {
-          Authorization: 'Bearer test-token',
+          'X-Auth-Email': 'test@example.com',
+          'X-Auth-Key': 'test-token',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           type: 'CNAME',
           name: 'grace-church.churchos.my',
-          content: 'app.churchos.my',
+          content: 'churchos.my',
           ttl: 3600,
           proxied: true
         })
@@ -105,7 +113,7 @@ describe('Cloudflare DNS provisioning', () => {
           id: 'record-id',
           type: 'CNAME',
           name: 'grace-church.churchos.my',
-          content: 'app.churchos.my'
+          content: 'churchos.my'
         }]
       }))
       .mockResolvedValueOnce(cloudflareResponse({ success: true, result: {} }))

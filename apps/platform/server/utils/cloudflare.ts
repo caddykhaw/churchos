@@ -58,7 +58,8 @@ function getDnsRecordsUrl(zoneId: string): string {
 
 function cloudflareHeaders(apiToken: string): HeadersInit {
   return {
-    Authorization: `Bearer ${apiToken}`,
+    'X-Auth-Email': process.env.CLOUDFLARE_EMAIL || '',
+    'X-Auth-Key': apiToken,
     'Content-Type': 'application/json'
   }
 }
@@ -77,7 +78,7 @@ async function parseCloudflareResponse<T>(response: Response): Promise<Cloudflar
   return body
 }
 
-/** Creates the proxied CNAME `{slug}.churchos.my` -> `app.churchos.my`. */
+/** Creates the proxied CNAME `{slug}.churchos.my` -> `churchos.my` (-> Pages). */
 export async function provisionSubdomain(slug: string): Promise<void> {
   const recordName = getSubdomainRecordName(slug)
   const credentials = getCloudflareCredentials()

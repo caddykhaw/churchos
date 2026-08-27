@@ -6,7 +6,7 @@ Multi-tenant SaaS for Malaysian churches. Modules: PEOPLE (ChMS), JOURNEY (LMS),
 
 - Nuxt 4, Vue 3, TypeScript, Nitro
 - Supabase (Postgres + Auth + Realtime + Storage) — self-hosted via Docker
-- Cloudflare Pages (hosting) + Cloudflare DNS (tenant subdomains under `churchos.nikkohosting.com`)
+- Cloudflare Pages (hosting) + Cloudflare DNS (tenant subdomains under `churchos.my`)
 - Stripe (billing), Resend (email)
 - pnpm workspaces (monorepo)
 
@@ -15,7 +15,7 @@ Multi-tenant SaaS for Malaysian churches. Modules: PEOPLE (ChMS), JOURNEY (LMS),
 - Node `>=24.11.0 <25`
 - pnpm `11.19.0`
 - Docker (for local Supabase)
-- Cloudflare account with the `churchos.nikkohosting.com` zone (or wildcard parent zone)
+- Cloudflare account with the `churchos.my` zone configured with Pages
 
 ## Setup
 

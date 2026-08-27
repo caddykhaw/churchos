@@ -89,12 +89,14 @@ churchos/
 
 ```
 Cloudflare
-├── churchos.my (marketing) → Static Pages
-├── app.churchos.my → Nuxt SSR + Nitro
-├── *.churchos.my → CNAME to app.churchos.my
-└── db.churchos.my → VPS (Docker Supabase)
+├── churchos.my → Cloudflare Pages (marketing + platform SSR)
+├── www.churchos.my → CNAME churchos.my (Pages)
+├── app.churchos.my → CNAME churchos-platform.pages.dev (Pages, platform SSR)
+├── *.churchos.my → CNAME churchos.my (Pages, for tenant subdomains)
+├── db.churchos.my → VPS:33001 (Supabase Studio only, proxied)
+└── Caddy routes any remaining subdomains to VPS services
 
-VPS (4 vCPU, 7.8GB RAM)
+VPS (4 vCPU, 7.8GB RAM) — serves only db.churchos.my (Studio)
 ├── PostgreSQL (2GB RAM)
 ├── PostgREST (512MB)
 ├── Realtime (512MB)
@@ -102,6 +104,12 @@ VPS (4 vCPU, 7.8GB RAM)
 ├── Studio (256MB)
 └── Nginx (128MB)
 ```
+
+**DNS routing:**
+- `churchos.my` → CNAME → `churchos-platform.pages.dev` (Pages)
+- `app.churchos.my` → CNAME → `churchos-platform.pages.dev` (Pages)
+- `{slug}.churchos.my` → CNAME → `churchos.my` → Pages (via Cloudflare API provisioning)
+- `db.churchos.my` → A record → `YOUR_VPS_IP` → Caddy → `localhost:33001` (Studio)
 
 ---
 
@@ -422,7 +430,7 @@ Every module API endpoint calls `requireModule(event, 'module-name')` before pro
 2. Validate slug format: `^[a-z0-9-]{3,30}$`, check reserved words
 3. Check availability in `organizations.slug`
 4. Create organization record with trial
-5. Cloudflare API: Create CNAME `firstchurch.churchos.my → app.churchos.my` (proxied)
+5. Cloudflare API: Create CNAME `firstchurch.churchos.my → churchos.my` (proxied, → Pages)
 6. User redirected to subdomain
 
 ### Custom domain flow
