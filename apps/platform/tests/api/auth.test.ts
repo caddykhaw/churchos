@@ -13,6 +13,7 @@ const signup = (await import('../../server/api/auth/signup.post')).default
 const login = (await import('../../server/api/auth/login.post')).default
 const logout = (await import('../../server/api/auth/logout.post')).default
 const me = (await import('../../server/api/auth/me.get')).default
+const setSession = (await import('../../server/api/auth/set-session.post')).default
 
 function expectHttpError(error: unknown, statusCode: number, message: string) {
   expect(error).toMatchObject({ statusCode, message })
@@ -47,6 +48,11 @@ function createSignInClient({
 } = {}) {
   const signInWithPassword = vi.fn(async () => ({ data: { session }, error }))
   return { auth: { signInWithPassword }, signInWithPassword }
+}
+
+function createSessionClient({ user = { id: 'user-1' }, error = null }: { user?: { id: string } | null, error?: unknown } = {}) {
+  const getUser = vi.fn(async () => ({ data: { user }, error }))
+  return { auth: { getUser }, getUser }
 }
 
 describe('auth API endpoints', () => {
@@ -119,6 +125,39 @@ describe('auth API endpoints', () => {
   it('deletes the session cookie on logout', () => {
     expect(logout({} as never)).toEqual({ success: true })
     expect(globalThis.deleteCookie).toHaveBeenCalledWith(expect.anything(), '__session', { path: '/' })
+  })
+
+  it('stores a protected session cookie after client-side authentication', async () => {
+    const client = createSessionClient()
+    mocks.createClient.mockReturnValue(client)
+    vi.stubGlobal('readBody', async () => ({ accessToken: 'otp-access-token' }))
+
+    await expect(setSession({} as never)).resolves.toEqual({ success: true })
+    expect(client.getUser).toHaveBeenCalledWith('otp-access-token')
+    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).toHaveBeenCalledWith(expect.anything(), '__session', 'otp-access-token', expect.objectContaining({
+      httpOnly: true, sameSite: 'lax', maxAge: 604800, path: '/'
+    }))
+  })
+
+  it('rejects a missing access token before storing a session cookie', async () => {
+    vi.stubGlobal('readBody', async () => ({}))
+
+    await expect(setSession({} as never)).rejects.toSatisfy(error => {
+      expectHttpError(error, 400, 'Access token required')
+      return true
+    })
+    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid access token before storing a session cookie', async () => {
+    mocks.createClient.mockReturnValue(createSessionClient({ user: null, error: { message: 'Invalid JWT' } }))
+    vi.stubGlobal('readBody', async () => ({ accessToken: 'invalid-token' }))
+
+    await expect(setSession({} as never)).rejects.toSatisfy(error => {
+      expectHttpError(error, 401, 'Invalid session')
+      return true
+    })
+    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
   })
 
   it('returns the current user and organization context from the middleware', async () => {
