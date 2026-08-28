@@ -66,6 +66,8 @@ describe('auth API endpoints', () => {
     vi.stubGlobal('useRuntimeConfig', () => ({
       public: { supabaseUrl: 'http://supabase.test', supabaseAnonKey: 'anon-key' }
     }))
+    vi.stubGlobal('getRequestHeader', (_event: unknown, name: string) => name === 'origin' ? 'https://app.churchos.test' : undefined)
+    vi.stubGlobal('getRequestURL', () => new URL('https://app.churchos.test/api/auth/set-session'))
     vi.stubGlobal('setCookie', vi.fn())
     vi.stubGlobal('deleteCookie', vi.fn())
   })
@@ -146,6 +148,18 @@ describe('auth API endpoints', () => {
       expectHttpError(error, 400, 'Access token required')
       return true
     })
+    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
+  })
+
+  it('rejects a cross-origin request before validating or storing a session', async () => {
+    vi.stubGlobal('getRequestHeader', (_event: unknown, name: string) => name === 'origin' ? 'https://attacker.example' : undefined)
+    vi.stubGlobal('readBody', async () => ({ accessToken: 'attacker-access-token' }))
+
+    await expect(setSession({} as never)).rejects.toSatisfy(error => {
+      expectHttpError(error, 403, 'Invalid request origin')
+      return true
+    })
+    expect(mocks.createClient).not.toHaveBeenCalled()
     expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
   })
 

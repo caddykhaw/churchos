@@ -4,6 +4,14 @@ const SESSION_COOKIE = '__session'
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 
 export default defineEventHandler(async (event) => {
+  // This endpoint turns a browser-held Supabase token into an HttpOnly cookie.
+  // Reject cross-origin requests so a site holding its own valid token cannot
+  // force a visitor into that account (login CSRF/session fixation).
+  const origin = getRequestHeader(event, 'origin')
+  if (!origin || origin !== getRequestURL(event).origin) {
+    throw createError({ statusCode: 403, message: 'Invalid request origin' })
+  }
+
   const body = await readBody<{ accessToken?: unknown }>(event)
   const accessToken = typeof body?.accessToken === 'string' ? body.accessToken : ''
 
