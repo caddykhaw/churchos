@@ -9,15 +9,17 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'http://localhost:38080',
-    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || process.env.NUXT_SUPABASE_SERVICE_KEY || '',
-    cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN || '',
-    cloudflareZoneId: process.env.CLOUDFLARE_ZONE_ID || '',
-    cloudflarePagesProject: process.env.CLOUDFLARE_PAGES_PROJECT || '',
-    jwtSecret: process.env.JWT_SECRET || '',
+    // Server-only (never exposed to client)
+    stripeSecret: '',
+    stripeWebhookSecret: '',
+    resendApiKey: '',
+    // Public keys (exposed to client)
     public: {
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+      platformUrl: process.env.PLATFORM_URL || 'https://app.churchos.my',
+      marketingUrl: process.env.MARKETING_URL || 'https://churchos.my',
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'http://localhost:38080',
-      supabaseAnonKey: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+      supabaseAnonKey: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
     }
   },
 
