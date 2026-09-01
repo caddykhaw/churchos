@@ -1,14 +1,10 @@
-import Stripe from 'stripe'
-
-const runtimeConfig = useRuntimeConfig()
-
-const stripe = new Stripe(runtimeConfig.stripeSecret || process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20'
-})
+import { createCheckoutSession } from '../../utils/stripe-client'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { churchName, pastorEmail, tier, billingCycle } = body
+
+  const config = useRuntimeConfig()
 
   // Validate required fields
   if (!churchName || !pastorEmail || !tier || !billingCycle) {
@@ -28,21 +24,19 @@ export default defineEventHandler(async (event) => {
   }
 
   // Map tier + billing cycle to Stripe Price ID
-  // These would be configured in your Stripe dashboard
-  // If using environment variables:
   const priceIdMap = {
     starter: {
-      monthly: runtimeConfig.stripePriceStarterMonthly || process.env.STARTER_MONTHLY_PRICE_ID,
-      annual: runtimeConfig.stripePriceStarterAnnual || process.env.STARTER_ANNUAL_PRICE_ID
+      monthly: config.stripePriceStarterMonthly || process.env.STARTER_MONTHLY_PRICE_ID,
+      annual: config.stripePriceStarterAnnual || process.env.STARTER_ANNUAL_PRICE_ID,
     },
     growth: {
-      monthly: runtimeConfig.stripePriceGrowthMonthly || process.env.GROWTH_MONTHLY_PRICE_ID,
-      annual: runtimeConfig.stripePriceGrowthAnnual || process.env.GROWTH_ANNUAL_PRICE_ID
+      monthly: config.stripePriceGrowthMonthly || process.env.GROWTH_MONTHLY_PRICE_ID,
+      annual: config.stripePriceGrowthAnnual || process.env.GROWTH_ANNUAL_PRICE_ID,
     },
     pro: {
-      monthly: runtimeConfig.stripePriceProMonthly || process.env.PRO_MONTHLY_PRICE_ID,
-      annual: runtimeConfig.stripePriceProAnnual || process.env.PRO_ANNUAL_PRICE_ID
-    }
+      monthly: config.stripePriceProMonthly || process.env.PRO_MONTHLY_PRICE_ID,
+      annual: config.stripePriceProAnnual || process.env.PRO_ANNUAL_PRICE_ID,
+    },
   }
 
   const priceId = priceIdMap[tier as keyof typeof priceIdMap][billingCycle as 'monthly' | 'annual']
@@ -59,37 +53,34 @@ export default defineEventHandler(async (event) => {
     .replace(/-+/g, '-')
     .substring(0, 30)
 
-  // Store a pending signup record (could also use a temp table or cache)
-  // This allows us to associate the checkout session with the church data
-  const pendingSignupId = crypto.randomUUID()
-
-  // Create Checkout Session
-  const session = await stripe.checkout.sessions.create({
+  // Create Checkout Session via direct Stripe REST API (Workers-compatible)
+  const session = await createCheckoutSession({
     mode: 'subscription',
     customer_email: pastorEmail,
     customer_creation: 'if_required',
-    line_items: [{
-      price: priceId,
-      quantity: 1
-    }],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
     metadata: {
       church_name: churchName,
       pastor_email: pastorEmail,
-      tier: tier,
+      tier,
       billing_cycle: billingCycle,
       slug: baseSlug,
-      pending_signup_id: pendingSignupId
     },
-    success_url: `${runtimeConfig.platformUrl || process.env.PLATFORM_URL}/onboard/complete?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${runtimeConfig.marketingUrl || process.env.MARKETING_URL}/signup`,
+    success_url: `${config.public.platformUrl || process.env.PLATFORM_URL}/onboard/complete?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${config.public.marketingUrl || process.env.MARKETING_URL}/signup`,
     automatic_tax: { enabled: true },
     subscription_data: {
-      trial_period_days: 14
+      trial_period_days: 14,
     },
     customer_update: {
-      address: 'auto'
+      address: 'auto',
     },
-    payment_method_collection: 'always'
+    payment_method_collection: 'always',
   })
 
   return { url: session.url }

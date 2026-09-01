@@ -19,3 +19,7 @@ docker/.env
 
 # Analysis output
 graphify-out/
+
+# Command Code local overrides (per-user approvals)
+.commandcode/settings.local.json
+

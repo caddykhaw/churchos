@@ -1,16 +1,13 @@
-import Stripe from 'stripe'
-
-const config = useRuntimeConfig()
-
-const stripe = new Stripe(config.stripeSecret || process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20'
-})
+import { createBillingPortalSession } from '../../utils/stripe-client'
 
 /**
  * Creates a Stripe Customer Portal session so churches can:
  * - Update their payment method
  * - View billing history
  * - Cancel or change their subscription
+ *
+ * Uses direct Stripe REST API call instead of the `stripe` npm package,
+ * which bundles node:stream and breaks on Cloudflare Workers.
  */
 export default defineEventHandler(async (event) => {
   // Verify the user is authenticated (uses your auth middleware)
@@ -19,6 +16,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 
+  const config = useRuntimeConfig()
   const supabase = useSupabaseServerClient()
 
   // Look up the org for this user
@@ -44,8 +42,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'No Stripe customer found for this organization' })
   }
 
-  // Create portal session
-  const portalSession = await stripe.billingPortal.sessions.create({
+  // Create portal session via direct Stripe API call
+  const portalSession = await createBillingPortalSession({
     customer: org.subscription_stripe_customer_id,
     return_url: `${config.public.platformUrl}/account/billing`,
   })
