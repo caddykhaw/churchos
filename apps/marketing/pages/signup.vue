@@ -12,21 +12,24 @@ const tiers = [
     name: 'Starter',
     modules: 'All modules',
     monthly: 'RM 236',
-    annual: 'RM 1,982'
+    annual: 'RM 1,982',
+    note: '≤ 100 members'
   },
   {
     id: 'growth',
     name: 'Growth',
     modules: 'All modules',
     monthly: 'RM 474',
-    annual: 'RM 3,979'
+    annual: 'RM 3,979',
+    note: '≤ 300 members'
   },
   {
     id: 'pro',
     name: 'Pro',
     modules: 'All modules',
     monthly: 'RM 746',
-    annual: 'RM 6,263'
+    annual: 'RM 6,263',
+    note: 'Unlimited members'
   }
 ]
 
@@ -58,126 +61,113 @@ function selectTier(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#171717] text-gray-200">
-    <header class="container mx-auto px-6 py-8">
-      <div class="flex justify-between items-center">
-        <NuxtLink to="/" class="text-2xl font-bold text-white">ChurchOS</NuxtLink>
-        <NuxtLink to="/" class="text-gray-400 hover:text-white transition-colors">Back to home</NuxtLink>
+  <div>
+    <header class="nav">
+      <div class="container nav-inner">
+        <NuxtLink to="/" class="nav-brand" aria-label="ChurchOS home">
+          <span class="mark" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M7 1 L13 13 H1 Z" />
+              <line x1="4" y1="8.5" x2="10" y2="8.5" />
+            </svg>
+          </span>
+          ChurchOS
+        </NuxtLink>
+        <div class="nav-actions">
+          <NuxtLink to="/" class="btn btn-ghost btn-sm">← Back to home</NuxtLink>
+        </div>
       </div>
     </header>
 
-    <main class="container mx-auto px-6 py-16 max-w-4xl">
-      <div class="text-center mb-12">
-        <h1 class="text-4xl font-bold text-white mb-4">Start your 14-day free trial</h1>
-        <p class="text-gray-400">No credit card required during trial. Full access to all modules.</p>
+    <section class="page-head">
+      <div class="container">
+        <span class="eyebrow">Free trial</span>
+        <h1 class="display">Start your 14-day free trial.</h1>
+        <p class="lead" style="margin-top: 16px;">
+          Full access to People, Journey, and Pages. No credit card during trial.
+        </p>
       </div>
+    </section>
 
-      <div class="grid lg:grid-cols-2 gap-12">
-        <!-- Signup form -->
-        <div>
-          <form @submit.prevent="handleSubmit" class="space-y-6">
-            <div>
-              <label for="church-name" class="block text-sm font-medium text-gray-300 mb-2">Church Name</label>
-              <input
-                id="church-name"
-                v-model="churchName"
-                type="text"
-                required
-                placeholder="e.g. First Church KL"
-                class="w-full px-4 py-3 bg-[#2a2a2a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              />
-            </div>
-
-            <div>
-              <label for="pastor-email" class="block text-sm font-medium text-gray-300 mb-2">Pastor's Email</label>
-              <input
-                id="pastor-email"
-                v-model="pastorEmail"
-                type="email"
-                required
-                placeholder="pastor@firstchurch.my"
-                class="w-full px-4 py-3 bg-[#2a2a2a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Choose a plan</label>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  v-for="tier in tiers"
-                  :key="tier.id"
-                  type="button"
-                  @click="selectTier(tier.id)"
-                  class="p-4 text-center border rounded-lg transition-all"
-                  :class="selectedTier === tier.id
-                    ? 'border-white bg-[#3a3a3a] text-white'
-                    : 'border-gray-700 hover:border-gray-500 text-gray-400'"
-                >
-                  <div class="font-bold">{{ tier.name }}</div>
-                  <div class="text-sm mt-1">{{ tier.modules }}</div>
-                  <div class="text-lg mt-2 text-white">{{ billingCycle === 'annual' ? tier.annual : tier.monthly }}</div>
-                  <div v-if="billingCycle === 'annual'" class="text-xs text-gray-500 mt-1">billed annually</div>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Billing Cycle</label>
-              <div class="flex gap-4">
-                <label class="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    value="annual"
-                    v-model="billingCycle"
-                    class="text-gray-400 focus:ring-gray-500"
-                  />
-                  <span>Annual (save 30%)</span>
-                </label>
-                <label class="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    value="monthly"
-                    v-model="billingCycle"
-                    class="text-gray-400 focus:ring-gray-500"
-                  />
-                  <span>Monthly</span>
-                </label>
-              </div>
-            </div>
-
-            <p v-if="error" class="text-red-400 text-sm" role="alert">{{ error }}</p>
-
-            <button
-              type="submit"
-              :disabled="loading"
-              class="w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-gray-200 transition disabled:opacity-50"
-            >
-              {{ loading ? 'Redirecting to payment...' : 'Get Started' }}
-            </button>
-          </form>
-
-          <p class="text-gray-500 text-xs mt-4">
-            By signing up, you agree to our <a href="/terms" class="hover:text-gray-300">Terms</a> and <a href="/privacy" class="hover:text-gray-300">Privacy Policy</a>.
-            You'll get a 14-day free trial before any charge.
-          </p>
-        </div>
-
-        <!-- Features summary -->
-        <div class="space-y-6">
-          <div v-for="feature in [
-            { title: 'Journey', desc: 'Sermon planning, events, and follow-up workflows' },
-            { title: 'People', desc: 'Member directory, groups, and pastoral care' },
-            { title: 'Pages', desc: 'Custom church website with multilingual support' }
-          ]" :key="feature.title" class="border border-gray-800 p-6 rounded-lg">
-            <h3 class="text-xl font-bold text-white mb-2">{{ feature.title }}</h3>
-            <p class="text-gray-400">{{ feature.desc }}</p>
+    <section style="padding-bottom: 100px;">
+      <div class="container form">
+        <form @submit.prevent="handleSubmit">
+          <div class="form-group">
+            <label class="form-label" for="church-name">Church name</label>
+            <input
+              id="church-name"
+              v-model="churchName"
+              type="text"
+              required
+              placeholder="e.g. First Church KL"
+              class="form-input"
+            />
           </div>
-        </div>
-      </div>
-    </main>
 
-    <footer class="border-t border-gray-800 py-8 text-center text-gray-500">
-      <p>&copy; 2026 ChurchOS. Multi-tenant SaaS for churches.</p>
+          <div class="form-group">
+            <label class="form-label" for="pastor-email">Pastor's email</label>
+            <input
+              id="pastor-email"
+              v-model="pastorEmail"
+              type="email"
+              required
+              placeholder="pastor@firstchurch.my"
+              class="form-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Choose a plan</label>
+            <div class="tier-grid">
+              <button
+                v-for="tier in tiers"
+                :key="tier.id"
+                type="button"
+                class="tier-option"
+                :class="{ active: selectedTier === tier.id }"
+                @click="selectTier(tier.id)"
+              >
+                <div class="name">{{ tier.name }}</div>
+                <div class="price">{{ billingCycle === 'annual' ? tier.annual : tier.monthly }}</div>
+                <div class="per">{{ billingCycle === 'annual' ? 'billed annually' : tier.note }}</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Billing cycle</label>
+            <div class="radio-row">
+              <label class="radio-label">
+                <input type="radio" value="annual" v-model="billingCycle" />
+                <span>Annual (save 30%)</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" value="monthly" v-model="billingCycle" />
+                <span>Monthly</span>
+              </label>
+            </div>
+          </div>
+
+          <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+
+          <button type="submit" :disabled="loading" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+            {{ loading ? 'Redirecting to payment…' : 'Get Started' }}
+          </button>
+        </form>
+
+        <p class="small muted" style="margin-top: 20px;">
+          By signing up you agree to our <a href="/terms" style="text-decoration: underline;">Terms</a>
+          and <a href="/privacy" style="text-decoration: underline;">Privacy Policy</a>.
+          Your 14-day trial begins immediately.
+        </p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="container footer-bottom" style="border-top: 0; margin-top: 0; padding-top: 0;">
+        <span>© 2026 ChurchOS</span>
+        <span>churchos.my</span>
+      </div>
     </footer>
   </div>
 </template>
