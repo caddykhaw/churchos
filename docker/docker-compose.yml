@@ -63,8 +63,9 @@ services:
         condition: service_healthy
 
   studio:
-    # Use latest tag (the plan's 20240729-15e7a36 is from 2024 and lacks modern env wiring)
-    image: supabase/studio:latest
+    # Pinned to the version upstream's docker/ compose ships and tests with
+    # postgres-meta v0.96.6 ("latest" Aug 2026 build 500s on /pg-meta/query proxy)
+    image: supabase/studio:2026.08.03-sha-022b374
     container_name: churchos-studio
     restart: unless-stopped
     ports:
@@ -72,11 +73,25 @@ services:
     environment:
       SUPABASE_URL: http://rest:3000
       SUPABASE_ANON_KEY: ${ANON_KEY}
-      # Required for studio to talk to db directly
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Required for studio to talk to db directly.
+      # NOTE: studio interpolates POSTGRES_PASSWORD *unencoded* into
+      # postgresql://user:PASS@host/db — a base64 password (/ and =) makes the
+      # URL unparseable and pg-meta rejects it ("invalid url"), so we pass the
+      # percent-encoded variant here. Only studio consumes it this way; db/rest
+      # still use the raw value.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_ENCODED}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: postgres
+      # Studio defaults these to supabase_read_only_user / supabase_admin,
+      # which don't exist in a plain postgres db — override to postgres
+      POSTGRES_USER_READ_WRITE: postgres
+      POSTGRES_USER_READ_ONLY: postgres
+      # Modern studio proxies ALL database-metadata queries (table editor,
+      # schema viz, etc.) through the pg-meta service. Without this the
+      # Table Editor fails with ERR_HTTP_INVALID_STATUS_CODE (500).
+      STUDIO_PG_META_URL: http://meta:8080
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
     healthcheck:
       test: ["CMD", "node", "-e", "a=require('os').networkInterfaces(),ip=Object.values(a).flat().find(i=>i&&i.family==='IPv4'&&!i.internal)?.address;require('http').get('http://'+ip+':3000/project/default',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
@@ -87,6 +102,26 @@ services:
         condition: service_healthy
       rest:
         condition: service_started
+      meta:
+        condition: service_started
+
+  meta:
+    # Database-metadata API the studio's Table Editor depends on
+    # (matches the official supabase/docker compose, pin supabase/postgres-meta)
+    image: supabase/postgres-meta:v0.96.6
+    container_name: churchos-meta
+    restart: unless-stopped
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
 
   nginx:
     image: nginx:alpine
