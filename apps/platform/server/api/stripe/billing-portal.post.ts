@@ -10,20 +10,19 @@ import { createBillingPortalSession } from '../../utils/stripe-client'
  * which bundles node:stream and breaks on Cloudflare Workers.
  */
 export default defineEventHandler(async (event) => {
-  // Verify the user is authenticated (uses your auth middleware)
-  const session = await getServerSession(event)
-  if (!session?.user?.id) {
+  const user = event.context.user
+  if (!user) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 
   const config = useRuntimeConfig()
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   // Look up the org for this user
   const { data: membership } = await supabase
     .from('organization_members')
     .select('organization_id')
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
     .eq('status', 'active')
     .limit(1)
     .maybeSingle()

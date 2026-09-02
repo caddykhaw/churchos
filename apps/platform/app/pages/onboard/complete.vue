@@ -36,7 +36,7 @@ onMounted(async () => {
   <div class="min-h-screen bg-[#171717] text-gray-200 flex items-center justify-center">
     <div class="text-center">
       <div v-if="loading">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"/>
         <p class="text-gray-400">Completing your setup...</p>
       </div>
       <div v-else-if="error">

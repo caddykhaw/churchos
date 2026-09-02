@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Stripe REST payloads are dynamic JSON at this boundary. */
 /**
  * Cloudflare Workers-compatible Stripe client.
  *

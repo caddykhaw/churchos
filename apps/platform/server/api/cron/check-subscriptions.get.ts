@@ -11,10 +11,11 @@
  */
 
 export default defineEventHandler(async () => {
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
   const config = useRuntimeConfig()
 
-  const now = new Date().toISOString()
+  const nowDate = new Date()
+  const now = nowDate.toISOString()
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -66,8 +67,8 @@ export default defineEventHandler(async () => {
     if (lastIncrement) {
       const lastDate = new Date(lastIncrement)
       const monthsDiff =
-        (now.getFullYear() - lastDate.getFullYear()) * 12 +
-        (now.getMonth() - lastDate.getMonth())
+        (nowDate.getFullYear() - lastDate.getFullYear()) * 12 +
+        (nowDate.getMonth() - lastDate.getMonth())
 
       if (monthsDiff >= 1) {
         await supabase

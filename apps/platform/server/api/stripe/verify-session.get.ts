@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid checkout session' })
   }
 
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
   const customerId = session.customer as string
 
   // Check if org already exists in Supabase

@@ -47,8 +47,8 @@ function getCloudflareCredentials(): CloudflareCredentials | null {
   }
 
   return {
-    apiToken: config.cloudflareApiToken,
-    zoneId: config.cloudflareZoneId
+    apiToken: String(config.cloudflareApiToken),
+    zoneId: String(config.cloudflareZoneId)
   }
 }
 

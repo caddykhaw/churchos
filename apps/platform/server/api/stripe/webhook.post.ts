@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Stripe JSON is validated by the signed webhook boundary. */
 import {
   verifyStripeWebhook,
   retrieveSubscription,
@@ -62,7 +63,7 @@ export default defineEventHandler(async (event) => {
 // ─── Handlers ─────────────────────────────────────────────
 
 async function handleCheckoutCompleted(session: any) {
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   // Only handle subscription checkouts
   if (session.mode !== 'subscription') {
@@ -184,7 +185,7 @@ async function handleCheckoutCompleted(session: any) {
 }
 
 async function handlePaymentSucceeded(invoice: any) {
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   const customerId = invoice.customer as string
   const { data: org } = await supabase
@@ -224,7 +225,7 @@ async function handlePaymentSucceeded(invoice: any) {
 }
 
 async function handlePaymentFailed(invoice: any) {
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   const customerId = invoice.customer as string
   const { data: org } = await supabase
@@ -248,7 +249,7 @@ async function handlePaymentFailed(invoice: any) {
 }
 
 async function handleSubscriptionUpdated(subscription: any) {
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   const subscriptionId = subscription.id
   const { data: org } = await supabase
@@ -284,7 +285,7 @@ async function handleSubscriptionUpdated(subscription: any) {
 }
 
 async function handleSubscriptionDeleted(subscription: any) {
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   const subscriptionId = subscription.id
   const { data: org } = await supabase
@@ -310,7 +311,7 @@ async function handleUpcomingInvoice(invoice: any) {
   const subscription = invoice.subscription
   if (!subscription || invoice.total === 0) return
 
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   const customerId = invoice.customer as string
   const { data: org } = await supabase

@@ -1,3 +1,5 @@
+import type { H3Event } from 'h3'
+
 /**
  * Joins a user to their pre-created organization.
  * The org was created during the Stripe Checkout webhook with the pastor's email
@@ -11,7 +13,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Email required' })
   }
 
-  const supabase = useSupabaseServerClient()
+  const supabase = useSupabaseAdmin()
 
   // Find the org that was created from the Stripe checkout session
   const { data: org, error: orgError } = await supabase
@@ -65,8 +67,6 @@ export default defineEventHandler(async (event) => {
   return { skipped: true }
 })
 
-async function getCurrentUserId(event: any): Promise<string | null> {
-  // Your auth middleware should populate event.context.user
-  const user = event.context?.user
-  return user?.id || null
+async function getCurrentUserId(event: H3Event): Promise<string | null> {
+  return event.context.user?.id ?? null
 }
