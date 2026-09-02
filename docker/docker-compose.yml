@@ -18,6 +18,15 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - db-data:/var/lib/postgresql/data
+    # Studio env uses POSTGRES_HOST=db / SUPABASE_URL=http://rest:3000 — those
+    # hostnames are resolved via NETWORK ALIASES, not container names. Declare
+    # them explicitly so they survive `docker compose up` recreations (a bare
+    # `docker network connect --alias` is lost on container recreation, which
+    # caused the recurring "Failed to retrieve tables" in Studio).
+    networks:
+      default:
+        aliases:
+          - db
     healthcheck:
       test: pg_isready -U postgres -h localhost
       interval: 5s
@@ -44,6 +53,11 @@ services:
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
       PGRST_DB_USE_LEGACY_GUCS: "false"
+    # Alias so Studio's SUPABASE_URL=http://rest:3000 resolves (see db comment)
+    networks:
+      default:
+        aliases:
+          - rest
     depends_on:
       db:
         condition: service_healthy
