@@ -72,4 +72,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: churchos-platform
-          directory: apps/platform/.output/public
+          directory: apps/platform/dist
