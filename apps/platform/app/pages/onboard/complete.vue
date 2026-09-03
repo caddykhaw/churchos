@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: false })
+
 const route = useRoute()
 const loading = ref(true)
 const error = ref('')
@@ -20,7 +22,7 @@ onMounted(async () => {
     }).catch(() => null)
 
     if (result) {
-      await navigateTo('/')
+      await navigateTo('/dashboard')
     } else {
       error.value = 'Could not verify your checkout session. Please contact support.'
     }
@@ -33,18 +35,28 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#171717] text-gray-200 flex items-center justify-center">
-    <div class="text-center">
-      <div v-if="loading">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"/>
-        <p class="text-gray-400">Completing your setup...</p>
-      </div>
-      <div v-else-if="error">
-        <p class="text-red-400">{{ error }}</p>
-        <p class="text-gray-500 text-sm mt-2">
-          You can try <NuxtLink to="/auth/login" class="text-white underline">signing in</NuxtLink> or contact support.
-        </p>
-      </div>
-    </div>
-  </div>
+  <main class="auth-page">
+    <section class="auth-card" style="text-align:center;">
+      <span class="brand-mark" style="margin:0 auto 18px;" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M7 1 L13 13 H1 Z" />
+          <line x1="4" y1="8.5" x2="10" y2="8.5" />
+        </svg>
+      </span>
+
+      <template v-if="loading">
+        <p class="display auth-title">Completing your setup…</p>
+        <p class="auth-sub">Just a moment while we confirm everything.</p>
+      </template>
+
+      <template v-else-if="error">
+        <p class="display auth-title" style="color:#fca5a5;">Something went wrong</p>
+        <p class="auth-sub">{{ error }}</p>
+        <div class="auth-actions" style="margin-top:18px;">
+          <NuxtLink to="/auth/login" class="btn btn-primary btn-block">Sign in</NuxtLink>
+          <NuxtLink to="https://churchos.my" class="btn btn-ghost btn-block">Back to churchos.my</NuxtLink>
+        </div>
+      </template>
+    </section>
+  </main>
 </template>

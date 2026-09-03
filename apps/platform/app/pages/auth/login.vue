@@ -1,45 +1,48 @@
 <template>
   <main class="auth-page">
     <section class="auth-card" aria-labelledby="login-title">
-      <h1 id="login-title">Sign In</h1>
+      <NuxtLink to="https://churchos.my" class="auth-brand" aria-label="Back to churchos.my">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M7 1 L13 13 H1 Z" />
+            <line x1="4" y1="8.5" x2="10" y2="8.5" />
+          </svg>
+        </span>
+        ChurchOS
+      </NuxtLink>
+
+      <h1 id="login-title" class="display auth-title">Sign in</h1>
+      <p class="auth-sub">Welcome back to your church workspace.</p>
 
       <form @submit.prevent="handleLogin">
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            required
-            autocomplete="email"
-          >
+        <div class="field">
+          <label class="field-label" for="email">Email</label>
+          <input id="email" v-model="email" class="input" type="email" required autocomplete="email" placeholder="you@church.example">
         </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            required
-            autocomplete="current-password"
-          >
+        <div class="field">
+          <label class="field-label" for="password">Password</label>
+          <input id="password" v-model="password" class="input" type="password" required autocomplete="current-password" placeholder="Your password">
         </div>
 
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
 
-        <button type="submit" :disabled="loading">
-          {{ loading ? 'Signing in...' : 'Sign In' }}
-        </button>
+        <div class="auth-actions">
+          <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
+            {{ loading ? 'Signing in…' : 'Sign in' }}
+          </button>
+        </div>
       </form>
 
-      <div class="divider" aria-hidden="true">OR</div>
+      <div class="auth-divider" aria-hidden="true">Or</div>
 
-      <button class="google-btn" :disabled="loading" @click="signInWithGoogle">
-        Sign in with Google
-      </button>
+      <div class="auth-actions">
+        <button class="btn btn-ghost btn-block" :disabled="loading" @click="signInWithGoogle">
+          Sign in with Google
+        </button>
+      </div>
 
-      <nav class="links" aria-label="Authentication options">
+      <nav class="auth-links" aria-label="Authentication options">
         <NuxtLink to="/auth/signup">Create account</NuxtLink>
         <NuxtLink to="/auth/verify-otp">Sign in with OTP</NuxtLink>
       </nav>
@@ -49,6 +52,7 @@
 
 <script setup lang="ts">
 import { createClient } from '@supabase/supabase-js'
+import type { AuthMeResponse } from '../../composables/useOrg'
 
 definePageMeta({ layout: false })
 
@@ -65,7 +69,6 @@ function errorMessage(err: unknown, fallback: string) {
       return data.message
     }
   }
-
   return fallback
 }
 
@@ -74,6 +77,15 @@ async function setSession(accessToken: string) {
     method: 'POST',
     body: { accessToken }
   })
+}
+
+async function routeAfterAuth() {
+  const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
+  if (me?.authenticated && me.organizations?.length) {
+    await navigateTo('/dashboard')
+  } else {
+    await navigateTo('/organizations/new')
+  }
 }
 
 async function handleLogin() {
@@ -86,7 +98,7 @@ async function handleLogin() {
       body: { email: email.value, password: password.value }
     })
 
-    await navigateTo('/dashboard')
+    await routeAfterAuth()
   } catch (err: unknown) {
     error.value = errorMessage(err, 'Login failed')
   } finally {
@@ -125,7 +137,7 @@ onMounted(async () => {
   loading.value = true
   try {
     await setSession(session.access_token)
-    await navigateTo('/dashboard')
+    await routeAfterAuth()
   } catch (err: unknown) {
     error.value = errorMessage(err, 'Unable to complete sign-in')
   } finally {
@@ -133,17 +145,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; background: #f9fafb; }
-.auth-card { width: 100%; max-width: 400px; padding: 2rem; background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgb(0 0 0 / 10%); }
-.form-group { margin-bottom: 1rem; }
-label { display: block; margin-bottom: .25rem; font-weight: 500; }
-input { box-sizing: border-box; width: 100%; padding: .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
-button { width: 100%; padding: .75rem; color: #fff; font-weight: 500; cursor: pointer; background: #3b82f6; border: 0; border-radius: .375rem; }
-button:disabled { cursor: not-allowed; opacity: .5; }
-.google-btn { margin-top: .5rem; color: #111827; background: #fff; border: 1px solid #d1d5db; }
-.error { margin-bottom: 1rem; color: #dc2626; font-size: .875rem; }
-.divider { margin: 1rem 0; color: #6b7280; font-size: .875rem; text-align: center; }
-.links { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; font-size: .875rem; }
-</style>

@@ -1,33 +1,48 @@
 <template>
   <main class="auth-page">
     <section class="auth-card" aria-labelledby="signup-title">
-      <h1 id="signup-title">Create Your Account</h1>
-      <p class="subtitle">You've completed payment. Now let's set up your ChurchOS account.</p>
+      <NuxtLink to="https://churchos.my" class="auth-brand" aria-label="Back to churchos.my">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M7 1 L13 13 H1 Z" />
+            <line x1="4" y1="8.5" x2="10" y2="8.5" />
+          </svg>
+        </span>
+        ChurchOS
+      </NuxtLink>
+
+      <h1 id="signup-title" class="display auth-title">Start your 14-day trial</h1>
+      <p class="auth-sub">
+        Create your account — no credit card required. Next you'll set up your
+        church workspace.
+      </p>
 
       <form @submit.prevent="handleSignup">
-        <div class="form-group">
-          <label for="display-name">Your Name</label>
-          <input id="display-name" v-model="displayName" required autocomplete="name">
+        <div class="field">
+          <label class="field-label" for="display-name">Your name</label>
+          <input id="display-name" v-model="displayName" class="input" required autocomplete="name" placeholder="Pastor John Tan">
         </div>
 
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input id="email" v-model="email" type="email" required autocomplete="email">
+        <div class="field">
+          <label class="field-label" for="email">Email</label>
+          <input id="email" v-model="email" class="input" type="email" required autocomplete="email" placeholder="you@church.example">
         </div>
 
-        <div class="form-group">
-          <label for="password">Password (min 8 characters)</label>
-          <input id="password" v-model="password" type="password" minlength="8" required autocomplete="new-password">
+        <div class="field">
+          <label class="field-label" for="password">Password</label>
+          <input id="password" v-model="password" class="input" type="password" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters">
         </div>
 
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
 
-        <button type="submit" :disabled="loading">
-          {{ loading ? 'Creating account...' : 'Create Account & Launch' }}
-        </button>
+        <div class="auth-actions">
+          <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
+            {{ loading ? 'Creating account…' : 'Create account' }}
+          </button>
+        </div>
       </form>
 
-      <nav class="links" aria-label="Authentication options">
+      <nav class="auth-links" aria-label="Authentication options">
         <NuxtLink to="/auth/login">Already have an account? Sign in</NuxtLink>
       </nav>
     </section>
@@ -35,6 +50,10 @@
 </template>
 
 <script setup lang="ts">
+import type { AuthMeResponse } from '../../composables/useOrg'
+
+definePageMeta({ layout: false })
+
 const displayName = ref('')
 const email = ref('')
 const password = ref('')
@@ -51,11 +70,20 @@ function errorMessage(err: unknown, fallback: string) {
   return fallback
 }
 
+async function routeAfterAuth() {
+  const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
+  if (me?.authenticated && me.organizations?.length) {
+    await navigateTo('/dashboard')
+  } else {
+    // Fresh trial accounts have no church yet — send them to the setup step.
+    await navigateTo('/organizations/new')
+  }
+}
+
 async function handleSignup() {
   error.value = ''
   loading.value = true
   try {
-    // Create auth user on the platform — the org was already created by the Stripe webhook
     await $fetch('/api/auth/signup', {
       method: 'POST',
       body: {
@@ -65,13 +93,7 @@ async function handleSignup() {
       }
     })
 
-    // Link user to their pre-created org
-    await $fetch('/api/org/join-org', {
-      method: 'POST',
-      body: { email: email.value }
-    }).catch(() => {}) // May already be a member
-
-    await navigateTo('/')
+    await routeAfterAuth()
   } catch (err: unknown) {
     error.value = errorMessage(err, 'Signup failed')
   } finally {
@@ -79,18 +101,3 @@ async function handleSignup() {
   }
 }
 </script>
-
-<style scoped>
-.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; background: #171717; }
-.auth-card { width: 100%; max-width: 400px; padding: 2rem; background: #2a2a2a; border-radius: .5rem; border: 1px solid #3a3a3a; }
-.subtitle { color: #9ca3af; font-size: .875rem; margin-bottom: 1.5rem; text-align: center; }
-.form-group { margin-bottom: 1rem; }
-label { display: block; margin-bottom: .25rem; font-weight: 500; color: #d1d5db; }
-input { box-sizing: border-box; width: 100%; padding: .5rem; border: 1px solid #3a3a3a; border-radius: .375rem; background: #1a1a1a; color: #f9fafb; }
-button { width: 100%; padding: .75rem; color: #171717; font-weight: 500; cursor: pointer; background: #fff; border: 0; border-radius: .375rem; }
-button:disabled { cursor: not-allowed; opacity: .5; }
-.error { margin-bottom: 1rem; color: #fca5a5; font-size: .875rem; }
-.links { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; font-size: .875rem; }
-.links a { color: #9ca3af; }
-.links a:hover { color: #f9fafb; }
-</style>

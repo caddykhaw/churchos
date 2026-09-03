@@ -9,7 +9,7 @@ export interface OrganizationSummary {
   roles?: string[]
 }
 
-interface AuthMeResponse {
+export interface AuthMeResponse {
   authenticated: boolean
   organizations: OrganizationSummary[]
   currentOrg: OrganizationSummary | null
@@ -24,32 +24,26 @@ export function useOrg() {
 
     if (data.authenticated) {
       userOrgs.value = data.organizations || []
-      currentOrg.value = data.currentOrg
+      currentOrg.value = data.currentOrg || userOrgs.value[0] || null
     } else {
       userOrgs.value = []
       currentOrg.value = null
     }
   }
 
-  function switchOrg(orgSlug: string) {
-    if (!import.meta.client) return
-
-    const { protocol, host } = window.location
-    if (host.includes('localhost')) {
-      window.location.assign(`${protocol}//${host}/_org/${orgSlug}`)
-      return
-    }
-
-    const rootDomain = host.includes('staging')
-      ? 'staging.churchos.my'
-      : 'churchos.my'
-    window.location.assign(`${protocol}//${orgSlug}.${rootDomain}`)
+  /** Persists the selected org (cookie) and returns to the dashboard. */
+  async function selectOrg(orgId: string) {
+    await $fetch('/api/org/select', {
+      method: 'POST',
+      body: { organizationId: orgId }
+    })
+    currentOrg.value = userOrgs.value.find((org) => org.id === orgId) ?? null
   }
 
   return {
     currentOrg: readonly(currentOrg),
     userOrgs: readonly(userOrgs),
     loadUserOrgs,
-    switchOrg,
+    selectOrg,
   }
 }

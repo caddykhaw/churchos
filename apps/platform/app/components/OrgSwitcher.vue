@@ -3,66 +3,68 @@
     <button
       v-if="currentOrg"
       type="button"
-      class="trigger"
+      class="org-trigger"
       :aria-expanded="open"
       aria-haspopup="menu"
       @click="open = !open"
     >
-      <span class="org-icon" aria-hidden="true">{{ initial(currentOrg.name) }}</span>
-      <span class="org-info">
+      <span class="org-avatar" aria-hidden="true">{{ initial(currentOrg.name) }}</span>
+      <span class="org-meta">
         <span class="org-name">{{ currentOrg.name }}</span>
         <span class="org-slug">{{ currentOrg.slug }}.churchos.my</span>
       </span>
-      <span aria-hidden="true">⌄</span>
+      <span class="org-caret" aria-hidden="true">⌄</span>
     </button>
 
-    <NuxtLink v-else to="/organizations/new" class="create-org">Create organization</NuxtLink>
+    <NuxtLink v-else to="/organizations/new" class="btn btn-ghost btn-block btn-sm">Create organization</NuxtLink>
 
-    <div v-if="open" class="dropdown" role="menu">
+    <div v-if="open" class="org-dropdown" role="menu">
       <button
         v-for="org in userOrgs"
         :key="org.id"
         type="button"
         class="org-item"
+        :class="{ current: org.id === currentOrg?.id }"
         role="menuitem"
-        @click="switchOrg(org.slug)"
+        @click="switchOrg(org.id)"
       >
-        <span class="org-icon" aria-hidden="true">{{ initial(org.name) }}</span>
-        <span class="org-info">
+        <span class="org-avatar" aria-hidden="true">{{ initial(org.name) }}</span>
+        <span class="org-meta">
           <span class="org-name">{{ org.name }}</span>
           <span class="org-slug">{{ org.slug }}.churchos.my</span>
         </span>
-        <span v-if="org.id === currentOrg?.id" aria-label="Current organization">✓</span>
+        <span v-if="org.id === currentOrg?.id" class="check" aria-label="Current organization">✓</span>
       </button>
-      <NuxtLink to="/organizations/new" class="new-org" role="menuitem">+ Create new organization</NuxtLink>
+      <NuxtLink to="/organizations/new" class="org-create" role="menuitem">+ Create new organization</NuxtLink>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const open = ref(false)
-const { currentOrg, userOrgs, loadUserOrgs, switchOrg } = useOrg()
+const { currentOrg, userOrgs, loadUserOrgs, selectOrg } = useOrg()
 
 function initial(name: string) {
   return name.charAt(0).toUpperCase()
+}
+
+async function switchOrg(orgId: string) {
+  if (orgId === currentOrg.value?.id) {
+    open.value = false
+    return
+  }
+
+  try {
+    await selectOrg(orgId)
+    await navigateTo('/dashboard')
+  } catch {
+    // Selection failed — keep the dropdown open so the user can retry.
+  } finally {
+    open.value = false
+  }
 }
 
 onMounted(() => {
   void loadUserOrgs()
 })
 </script>
-
-<style scoped>
-.org-switcher { position: relative; }
-.trigger, .org-item { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .5rem; background: transparent; border: 1px solid #e5e7eb; border-radius: .375rem; color: #111827; cursor: pointer; text-align: left; }
-.org-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: .375rem; background: #2563eb; color: white; font-weight: 600; }
-.org-info { display: grid; flex: 1; min-width: 0; }
-.org-name { overflow: hidden; font-size: .875rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.org-slug { color: #6b7280; font-size: .75rem; }
-.dropdown { position: absolute; z-index: 10; top: calc(100% + .25rem); right: 0; left: 0; overflow: hidden; background: white; border: 1px solid #e5e7eb; border-radius: .375rem; box-shadow: 0 4px 6px rgb(0 0 0 / 10%); }
-.org-item { border: 0; border-radius: 0; }
-.org-item:hover { background: #f9fafb; }
-.new-org, .create-org { display: block; padding: .75rem; color: #2563eb; font-size: .875rem; text-decoration: none; }
-.new-org { border-top: 1px solid #e5e7eb; }
-.create-org { border: 1px solid #e5e7eb; border-radius: .375rem; }
-</style>

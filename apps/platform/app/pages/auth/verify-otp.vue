@@ -1,33 +1,49 @@
 <template>
   <main class="auth-page">
     <section class="auth-card" aria-labelledby="otp-title">
-      <h1 id="otp-title">Sign in with OTP</h1>
+      <NuxtLink to="https://churchos.my" class="auth-brand" aria-label="Back to churchos.my">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M7 1 L13 13 H1 Z" />
+            <line x1="4" y1="8.5" x2="10" y2="8.5" />
+          </svg>
+        </span>
+        ChurchOS
+      </NuxtLink>
+
+      <h1 id="otp-title" class="display auth-title">Sign in with OTP</h1>
+      <p class="auth-sub">We'll text you a one-time code to verify your number.</p>
 
       <form v-if="!otpSent" @submit.prevent="handleRequestOtp">
-        <div class="form-group">
-          <label for="phone">Phone Number</label>
-          <input id="phone" v-model="phone" type="tel" placeholder="+601****6789" required autocomplete="tel">
+        <div class="field">
+          <label class="field-label" for="phone">Phone number</label>
+          <input id="phone" v-model="phone" class="input" type="tel" placeholder="+6012 345 6789" required autocomplete="tel">
         </div>
 
-        <button type="submit" :disabled="loading">
-          {{ loading ? 'Sending...' : 'Send Code' }}
-        </button>
+        <div class="auth-actions">
+          <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
+            {{ loading ? 'Sending…' : 'Send code' }}
+          </button>
+        </div>
       </form>
 
       <form v-else @submit.prevent="handleVerifyOtp">
-        <p>Enter the code sent to {{ phone }}</p>
-        <div class="form-group">
-          <label for="otp">6-digit code</label>
-          <input id="otp" v-model="otp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code">
+        <p class="auth-sub">Enter the code sent to <strong class="muted">{{ phone }}</strong>.</p>
+        <div class="field">
+          <label class="field-label" for="otp">6-digit code</label>
+          <input id="otp" v-model="otp" class="input" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code">
         </div>
 
-        <button type="submit" :disabled="loading">
-          {{ loading ? 'Verifying...' : 'Verify' }}
-        </button>
+        <div class="auth-actions">
+          <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
+            {{ loading ? 'Verifying…' : 'Verify' }}
+          </button>
+        </div>
       </form>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <nav class="links" aria-label="Authentication options">
+      <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+
+      <nav class="auth-links" aria-label="Authentication options">
         <NuxtLink to="/auth/login">Sign in with password</NuxtLink>
       </nav>
     </section>
@@ -36,6 +52,7 @@
 
 <script setup lang="ts">
 import { createClient } from '@supabase/supabase-js'
+import type { AuthMeResponse } from '../../composables/useOrg'
 
 definePageMeta({ layout: false })
 
@@ -48,6 +65,15 @@ const config = useRuntimeConfig()
 
 function authClient() {
   return createClient(config.public.supabaseUrl, config.public.supabaseAnonKey)
+}
+
+async function routeAfterAuth() {
+  const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
+  if (me?.authenticated && me.organizations?.length) {
+    await navigateTo('/dashboard')
+  } else {
+    await navigateTo('/organizations/new')
+  }
 }
 
 async function handleRequestOtp() {
@@ -89,7 +115,7 @@ async function handleVerifyOtp() {
       method: 'POST',
       body: { accessToken: data.session.access_token }
     })
-    await navigateTo('/dashboard')
+    await routeAfterAuth()
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : 'Invalid OTP'
   } finally {
@@ -97,15 +123,3 @@ async function handleVerifyOtp() {
   }
 }
 </script>
-
-<style scoped>
-.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; background: #f9fafb; }
-.auth-card { width: 100%; max-width: 400px; padding: 2rem; background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgb(0 0 0 / 10%); }
-.form-group { margin-bottom: 1rem; }
-label { display: block; margin-bottom: .25rem; font-weight: 500; }
-input { box-sizing: border-box; width: 100%; padding: .5rem; border: 1px solid #d1d5db; border-radius: .375rem; }
-button { width: 100%; padding: .75rem; color: #fff; font-weight: 500; cursor: pointer; background: #3b82f6; border: 0; border-radius: .375rem; }
-button:disabled { cursor: not-allowed; opacity: .5; }
-.error { margin-top: 1rem; color: #dc2626; font-size: .875rem; }
-.links { margin-top: 1.5rem; font-size: .875rem; }
-</style>
