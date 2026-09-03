@@ -5,6 +5,10 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'cloudflare-pages'
   },
+  routeRules: {
+    // Signup/registration lives on the app (app.churchos.my), not the marketing site.
+    '/signup': { redirect: 'https://app.churchos.my/auth/signup' }
+  },
   css: ['~/assets/css/main.css'],
   app: {
     baseURL: '/',

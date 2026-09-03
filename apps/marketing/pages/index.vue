@@ -83,8 +83,8 @@ const mobileMenuOpen = ref(false)
         </nav>
 
         <div class="nav-actions">
-          <a href="https://app.churchos.my" class="btn btn-ghost btn-sm">Sign in</a>
-          <NuxtLink to="/signup" class="btn btn-primary btn-sm">Start free trial</NuxtLink>
+          <a href="https://app.churchos.my/auth/login" class="btn btn-ghost btn-sm">Sign in</a>
+          <a href="https://app.churchos.my/auth/signup" class="btn btn-primary btn-sm">Start free trial</a>
           <button class="nav-mobile-toggle" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Toggle menu">
             {{ mobileMenuOpen ? '✕' : '☰' }}
           </button>
@@ -104,7 +104,7 @@ const mobileMenuOpen = ref(false)
           in one system — so the admin gets done and you get back to ministry.
         </p>
         <div class="hero-actions">
-          <NuxtLink to="/signup" class="btn btn-primary">Start your 14-day trial</NuxtLink>
+          <a href="https://app.churchos.my/auth/signup" class="btn btn-primary">Start your 14-day trial</a>
           <a href="#modules" class="btn btn-ghost">See the modules</a>
         </div>
         <p class="hero-note">No credit card during trial · Full access to all modules</p>
@@ -215,7 +215,7 @@ const mobileMenuOpen = ref(false)
               </td>
               <td class="muted">{{ t.note }}</td>
               <td style="text-align: right;">
-                <NuxtLink to="/signup" class="btn btn-ghost btn-sm">Choose {{ t.name }}</NuxtLink>
+                <a href="https://app.churchos.my/auth/signup" class="btn btn-ghost btn-sm">Choose {{ t.name }}</a>
               </td>
             </tr>
           </tbody>
@@ -235,7 +235,7 @@ const mobileMenuOpen = ref(false)
           Set up your church in minutes. No credit card, no sales call, no friction.
         </p>
         <div style="margin-top: 40px;">
-          <NuxtLink to="/signup" class="btn btn-primary">Start your free trial</NuxtLink>
+          <a href="https://app.churchos.my/auth/signup" class="btn btn-primary">Start your free trial</a>
         </div>
       </div>
     </section>
@@ -261,8 +261,8 @@ const mobileMenuOpen = ref(false)
             <ul>
               <li><a href="#modules">Modules</a></li>
               <li><a href="#pricing">Pricing</a></li>
-              <li><a href="https://app.churchos.my">Sign in</a></li>
-              <li><NuxtLink to="/signup">Start free trial</NuxtLink></li>
+              <li><a href="https://app.churchos.my/auth/login">Sign in</a></li>
+              <li><a href="https://app.churchos.my/auth/signup">Start free trial</a></li>
             </ul>
           </div>
           <div>
