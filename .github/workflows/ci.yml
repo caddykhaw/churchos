@@ -23,6 +23,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # apps/platform/eslint.config.mjs imports the generated
+      # .nuxt/eslint.config.mjs, so prepare must run before lint.
+      - name: Prepare Nuxt (generates eslint config)
+        run: pnpm --filter platform exec nuxt prepare
+
       - name: Lint
         run: pnpm lint
 

@@ -47,6 +47,9 @@ importers:
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
+      eslint:
+        specifier: ^10.0.0
+        version: 10.9.1(jiti@2.7.0)(supports-color@10.2.2)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
