@@ -52,13 +52,116 @@ const stats = [
   { num: '14', label: 'Day free trial, no card required' }
 ]
 
-const tiers = [
-  { name: 'Starter', price: 'RM 236', per: '/month', note: 'Up to 100 members', members: '100' },
-  { name: 'Growth', price: 'RM 474', per: '/month', note: 'Up to 300 members', members: '300' },
-  { name: 'Pro', price: 'RM 746', per: '/month', note: 'Unlimited members', members: 'unlimited' }
+/* Pricing data (MYR, matches docs + Stripe checkout). Annual = monthly × 12 × 0.7. */
+const billing = ref<'monthly' | 'annual'>('monthly')
+const modulePlans = [
+  {
+    id: 'people',
+    accent: 'people',
+    code: 'PEOPLE',
+    name: 'People',
+    tag: 'Church management',
+    blurb: 'Member directory, donations, events, groups and volunteer scheduling — everything a growing congregation needs in one place.',
+    icon: 'users',
+    tiers: [
+      { name: 'Starter', cap: '≤ 100 members', price: 79 },
+      { name: 'Growth', cap: '≤ 300 members', price: 159 },
+      { name: 'Pro', cap: 'Unlimited members', price: 319 }
+    ],
+    features: [
+      'Member profiles, families & small groups',
+      'Donations tracked against giving records',
+      'Events, serving rosters & volunteer scheduling',
+      'Records isolated per church — nothing leaks between orgs'
+    ]
+  },
+  {
+    id: 'journey',
+    accent: 'journey',
+    code: 'JOURNEY',
+    name: 'Journey',
+    tag: 'Discipleship LMS',
+    blurb: 'Run teaching tracks that people actually finish — enrolment, mentors, progress and certificates, all visible to the people who need to see it.',
+    icon: 'route',
+    tiers: [
+      { name: 'Starter', cap: '3 tracks · 50 enrollments', price: 119 },
+      { name: 'Growth', cap: '10 tracks · 200 enrollments', price: 239 },
+      { name: 'Pro', cap: 'Unlimited tracks', price: 479 }
+    ],
+    features: [
+      'Tracks with milestones & mentor assignments',
+      'Certificates that carry across churches',
+      'Progress visible to leaders, private to members',
+      'Designed for small churches, scales to large ones'
+    ]
+  },
+  {
+    id: 'pages',
+    accent: 'pages',
+    code: 'PAGES',
+    name: 'Pages',
+    tag: 'Church website builder',
+    blurb: 'A people-centric church website you can edit yourself — multilingual content, no developer required, no page-builder lock-in.',
+    icon: 'globe',
+    tiers: [
+      { name: 'Standard', cap: 'EN · 中文', price: 79 },
+      { name: 'Pro languages', cap: 'EN · 中文 · BM · தமிழ்', price: 79, note: 'All 4 languages · All-in-One Pro' }
+    ],
+    features: [
+      'English, 中文, Bahasa Melayu & தமிழ் content',
+      'Block editor for sermons, events & pages',
+      'Your domain, your content — exportable anytime',
+      'Served fast through Cloudflare'
+    ]
+  }
 ]
 
+const bundlePlan = {
+  id: 'bundle',
+  accent: 'bundle',
+  code: 'ALL-IN-ONE',
+  name: 'All-in-One',
+  tag: 'Everything · best value',
+  blurb: 'All three modules with every language, a free custom domain for the first year, and 15% off subscribing separately.',
+  icon: 'sparkles',
+  tiers: [
+    { name: 'Starter', cap: '≤ 100 members', price: 236 },
+    { name: 'Growth', cap: '≤ 300 members', price: 474 },
+    { name: 'Pro', cap: 'Unlimited members', price: 746 }
+  ],
+  features: [
+    'Everything in PEOPLE + JOURNEY + PAGES',
+    'All four languages included',
+    'Free custom domain for year one',
+    '15% off vs separate modules'
+  ]
+}
+
+function fmtPrice(tier: { price: number }, annual: boolean) {
+  if (!annual) return `RM ${tier.price}`
+  return `RM ${Math.round(tier.price * 12 * 0.7).toLocaleString('en-MY')}`
+}
+function fmtPer(annual: boolean) {
+  return annual ? '/yr' : '/mo'
+}
+
 const mobileMenuOpen = ref(false)
+
+/* Shutter hero */
+const heroLines = ['Church administration,', 'quietly in order.']
+const heroChars = computed(() => heroLines.map(line => Array.from(line).map((ch, i) => ({ ch, i }))))
+const replay = ref(0)
+function replayShutter() {
+  replay.value++
+}
+function charDelay(i: number) {
+  return {
+    '--d-top': `${i * 45}ms`,
+    '--d-mid': `${i * 45 + 90}ms`,
+    '--d-bot': `${i * 45 + 180}ms`,
+    '--d-base': `${i * 45 + 280}ms`
+  }
+}
 </script>
 
 <template>
@@ -94,10 +197,21 @@ const mobileMenuOpen = ref(false)
 
     <!-- Hero -->
     <section class="hero">
+      <div class="hero-grid" aria-hidden="true"></div>
       <div class="container hero-inner">
         <span class="hero-tick"><span class="dot"></span> Built for Malaysian churches</span>
-        <h1 class="display">
-          Church administration,<br />quietly in order.
+        <h1 class="display hero-title" :key="replay">
+          <span v-for="(line, li) in heroChars" :key="li" class="hero-line">
+            <template v-for="c in line" :key="c.i">
+              <span v-if="c.ch !== ' '" class="shutter-char" :style="charDelay(c.i)">
+                <span class="shutter-base">{{ c.ch }}</span>
+                <span class="shutter-slice shutter-slice--top" aria-hidden="true">{{ c.ch }}</span>
+                <span class="shutter-slice shutter-slice--mid" aria-hidden="true">{{ c.ch }}</span>
+                <span class="shutter-slice shutter-slice--bot" aria-hidden="true">{{ c.ch }}</span>
+              </span>
+              <template v-else>{{ ' ' }}</template>
+            </template>
+          </span>
         </h1>
         <p class="lead">
           ChurchOS keeps your people, your teaching tracks, and your church website
@@ -106,6 +220,9 @@ const mobileMenuOpen = ref(false)
         <div class="hero-actions">
           <a href="https://app.churchos.my/auth/signup" class="btn btn-primary">Start your 14-day trial</a>
           <a href="#modules" class="btn btn-ghost">See the modules</a>
+          <button class="btn btn-icon" @click="replayShutter" aria-label="Replay headline animation" title="Replay">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          </button>
         </div>
         <p class="hero-note">No credit card during trial · Full access to all modules</p>
       </div>
@@ -189,40 +306,112 @@ const mobileMenuOpen = ref(false)
     </section>
 
     <!-- Pricing -->
-    <section id="pricing" class="section">
+    <section id="pricing" class="section pricing-section">
       <div class="container">
         <span class="eyebrow">Pricing</span>
-        <h2 class="display">Simple per-member pricing.</h2>
+        <h2 class="display">Pick your modules. Pay for what you use.</h2>
         <p class="lead" style="margin-top: 18px;">
-          One price per plan — all three modules included. No per-feature upsells.
+          Start with one module and add more as you grow. Every plan includes all the
+          core tools that module needs — no per-feature upsells.
         </p>
 
-        <table class="pricing-table">
-          <thead>
-            <tr>
-              <th>Plan</th>
-              <th>Price</th>
-              <th>Members</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in tiers" :key="t.name">
-              <td class="pricing-name">{{ t.name }}</td>
-              <td>
-                <span class="pricing-price">{{ t.price }}</span>
-                <span class="pricing-per">{{ t.per }}</span>
-              </td>
-              <td class="muted">{{ t.note }}</td>
-              <td style="text-align: right;">
-                <a href="https://app.churchos.my/auth/signup" class="btn btn-ghost btn-sm">Choose {{ t.name }}</a>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="billing-row">
+          <span class="billing-label">Billing cycle</span>
+          <div class="billing-toggle" role="group" aria-label="Billing cycle">
+            <button :class="{ on: billing === 'monthly' }" @click="billing = 'monthly'">Monthly</button>
+            <button :class="{ on: billing === 'annual' }" @click="billing = 'annual'">Annual <em>−30%</em></button>
+          </div>
+        </div>
+
+        <div class="price-grid">
+          <article v-for="(m, mi) in modulePlans" :key="m.id" class="price-card" :class="`price-card--${m.accent}`" :style="{ '--delay': (0.12 + mi * 0.1).toFixed(2) + 's' }">
+            <div class="price-card__glow" aria-hidden="true"></div>
+            <div class="price-card__inner">
+              <header class="price-card__head">
+                <span class="price-card__icon" aria-hidden="true">
+                  <svg v-if="m.icon === 'users'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <svg v-else-if="m.icon === 'route'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+                  <svg v-else-if="m.icon === 'globe'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </span>
+                <div>
+                  <h3 class="price-card__name">{{ m.name }}</h3>
+                  <p class="price-card__code">{{ m.code }} · {{ m.tag }}</p>
+                </div>
+              </header>
+
+              <p class="price-card__blurb">{{ m.blurb }}</p>
+
+              <div class="price-rows">
+                <div v-for="t in m.tiers" :key="t.name" class="price-row">
+                  <div class="price-row__label">
+                    <span>{{ t.name }}</span>
+                    <em>{{ t.cap }}</em>
+                  </div>
+                  <div class="price-row__amount">
+                    {{ fmtPrice(t, billing === 'annual') }}<span class="price-row__per">{{ fmtPer(billing === 'annual') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <ul class="price-feats">
+                <li v-for="f in m.features" :key="f">
+                  <span class="price-check" aria-hidden="true">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  </span>
+                  {{ f }}
+                </li>
+              </ul>
+
+              <a href="https://app.churchos.my/auth/signup" class="price-cta">Start with {{ m.name }} →</a>
+            </div>
+          </article>
+
+          <!-- Bundle card (highlighted) -->
+          <article class="price-card price-card--bundle price-card--featured" style="--delay: 0.5s">
+            <div class="price-card__glow" aria-hidden="true"></div>
+            <div class="price-card__inner">
+              <span class="price-badge">Best value</span>
+              <header class="price-card__head">
+                <span class="price-card__icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z"/></svg>
+                </span>
+                <div>
+                  <h3 class="price-card__name">{{ bundlePlan.name }}</h3>
+                  <p class="price-card__code">{{ bundlePlan.code }} · {{ bundlePlan.tag }}</p>
+                </div>
+              </header>
+
+              <p class="price-card__blurb">{{ bundlePlan.blurb }}</p>
+
+              <div class="price-rows">
+                <div v-for="t in bundlePlan.tiers" :key="t.name" class="price-row">
+                  <div class="price-row__label">
+                    <span>{{ t.name }}</span>
+                    <em>{{ t.cap }}</em>
+                  </div>
+                  <div class="price-row__amount">
+                    {{ fmtPrice(t, billing === 'annual') }}<span class="price-row__per">{{ fmtPer(billing === 'annual') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <ul class="price-feats">
+                <li v-for="f in bundlePlan.features" :key="f">
+                  <span class="price-check" aria-hidden="true">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  </span>
+                  {{ f }}
+                </li>
+              </ul>
+
+              <a href="https://app.churchos.my/auth/signup" class="price-cta">Start free trial →</a>
+            </div>
+          </article>
+        </div>
+
         <p class="pricing-note">
-          14-day free trial. Annual billing available at 30% off.
-          After the trial, accounts switch to read-only until reactivated.
+          14-day free trial on every plan. Annual billing is 30% off the monthly total.
+          After a trial ends, accounts switch to read-only until reactivated.
         </p>
       </div>
     </section>
