@@ -36,14 +36,15 @@
         <NuxtLink to="/account/billing" class="btn btn-ghost btn-sm">Manage billing</NuxtLink>
       </div>
       <p class="muted small" style="max-width:64ch;">
-        All modules are unlocked during your free trial. They're being prepared for
-        launch — you'll be able to open them from here.
+        All modules are unlocked during your free trial. Open one to start
+        building — members, tracks, and your church website live here.
       </p>
 
       <div class="module-grid">
-        <article
+        <NuxtLink
           v-for="module in modules"
           :key="module.id"
+          :to="module.href"
           class="module-card"
           :class="`module-card--${module.accent}`"
         >
@@ -53,9 +54,9 @@
               <span class="module-card__code">{{ module.code }}</span>
             </header>
             <p class="module-card__desc">{{ module.description }}</p>
-            <span class="coming-soon">Coming soon</span>
+            <span class="module-card__cta">Open module →</span>
           </div>
-        </article>
+        </NuxtLink>
       </div>
     </section>
 
@@ -92,8 +93,8 @@ const trialDaysLeft = computed(() => {
 })
 
 const modules = [
-  { id: 'people', accent: 'people', code: 'PEOPLE', name: 'People', description: 'Church management — members, families, donations, events, and volunteer scheduling.' },
-  { id: 'journey', accent: 'journey', code: 'JOURNEY', name: 'Journey', description: 'Discipleship LMS — teaching tracks, mentors, progress, and certificates.' },
-  { id: 'pages', accent: 'pages', code: 'PAGES', name: 'Pages', description: 'A people-centric website builder with multilingual content.' },
+  { id: 'people', accent: 'people', code: 'PEOPLE', name: 'People', description: 'Church management — members, families, donations, events, and volunteer scheduling.', href: '/people' },
+  { id: 'journey', accent: 'journey', code: 'JOURNEY', name: 'Journey', description: 'Discipleship LMS — teaching tracks, mentors, progress, and certificates.', href: '/journey' },
+  { id: 'pages', accent: 'pages', code: 'PAGES', name: 'Pages', description: 'A people-centric website builder with multilingual content.', href: '/pages' },
 ]
 </script>

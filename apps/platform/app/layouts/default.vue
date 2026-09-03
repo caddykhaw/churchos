@@ -18,6 +18,15 @@
         <NuxtLink to="/dashboard" class="side-link">
           Dashboard
         </NuxtLink>
+        <NuxtLink to="/people" class="side-link">
+          People
+        </NuxtLink>
+        <NuxtLink to="/journey" class="side-link">
+          Journey
+        </NuxtLink>
+        <NuxtLink to="/pages" class="side-link">
+          Pages
+        </NuxtLink>
         <NuxtLink to="/account/billing" class="side-link">
           Billing
         </NuxtLink>

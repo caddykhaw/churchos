@@ -39,7 +39,7 @@ export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pa
   const org = requireOrg(event)
 
   if (org.subscription_status === 'trial') {
-    return
+    return org
   }
 
   if (org.subscription_status === 'suspended') {
@@ -55,4 +55,6 @@ export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pa
       message: `Module '${module}' not included in your subscription`
     })
   }
+
+  return org
 }

@@ -407,17 +407,135 @@ h2.display { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; }
 .module-card__name { font-family: var(--font-display); font-size: 1.25rem; color: var(--text); }
 .module-card__code { font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-1, var(--violet)); }
 .module-card__desc { color: var(--text-3); font-size: 0.875rem; line-height: 1.55; }
-.coming-soon {
+.module-card__cta {
   align-self: flex-start;
+  margin-top: 6px;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-1, var(--violet));
+  transition: transform 0.15s ease;
+}
+.module-card:hover .module-card__inner { background: #171427; }
+.module-card:hover .module-card__cta { transform: translateX(3px); }
+
+/* ── Module pages: toolbars & forms ───────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.search-box { position: relative; flex: 1; max-width: 360px; }
+.search-box svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-4);
+  pointer-events: none;
+}
+.search-box .input { padding-left: 38px; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 6px 0 14px;
+}
+
+.form-card { max-width: 760px; margin-bottom: 24px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 18px; }
+.form-actions { display: flex; gap: 10px; margin-top: 4px; }
+
+/* ── Tables ────────────────────────────────────────────────── */
+.table-card { padding: 0; overflow: hidden; }
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.data-table th {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-3);
-  border: 1px solid var(--border-2);
-  padding: 3px 10px;
-  border-radius: 999px;
+  color: var(--text-4);
+  font-weight: 500;
+  text-align: left;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
+.data-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  vertical-align: middle;
+}
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+.cell-primary { color: var(--text); font-weight: 550; }
+.cell-sub { color: var(--text-4); font-size: 0.78rem; margin-top: 1px; }
+.cell-code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-2);
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+.col-right { text-align: right; }
+
+/* ── Publish toggle ────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  vertical-align: middle;
+}
+.toggle:disabled { opacity: 0.5; cursor: wait; }
+.toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.toggle--on { background: rgba(52, 211, 153, 0.18); border-color: rgba(52, 211, 153, 0.5); }
+.toggle--on .toggle__thumb { transform: translateX(18px); background: var(--emerald); }
+
+/* ── Track cards (Journey) ─────────────────────────────────── */
+.track-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.track-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--border-2);
+  border-radius: var(--r-md);
+}
+.track-card--published { border-top-color: var(--emerald); }
+.track-card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.track-card__title { font-family: var(--font-display); font-size: 1.15rem; color: var(--text); line-height: 1.2; }
+.track-card__zh { color: var(--text-4); font-size: 0.85rem; }
+.track-card__desc { color: var(--text-3); font-size: 0.875rem; line-height: 1.55; flex: 1; }
+.track-card__foot { border-top: 1px solid var(--border); padding-top: 12px; }
+.track-card__count { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
 
 /* ── Badges / misc ─────────────────────────────────────────── */
 .badge {
@@ -528,4 +646,6 @@ h2.display { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; }
   .side-foot-link { padding: 6px 10px; font-size: 0.8rem; }
   .main { padding: 20px 16px; }
   .module-grid { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .search-box { max-width: none; }
 }

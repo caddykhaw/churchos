@@ -37,3 +37,60 @@ export interface OrganizationMember {
 
 export type ModuleName = 'people' | 'journey' | 'pages'
 export type Role = 'admin' | 'member' | 'mentor' | 'volunteer'
+
+export interface Member {
+  id: string
+  organization_id: string
+  user_id: string | null
+  member_number: string | null
+  full_name: string
+  email: string | null
+  phone: string | null
+  gender: string | null
+  marital_status: string | null
+  date_of_birth: string | null
+  address: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
+  baptism_date: string | null
+  membership_date: string | null
+  member_status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Track {
+  id: string
+  organization_id: string
+  title_en: string
+  title_zh: string | null
+  description: string | null
+  prerequisite_track_id: string | null
+  status: 'draft' | 'published' | 'archived'
+  created_at: string
+  updated_at: string
+}
+
+export interface Enrollment {
+  id: string
+  organization_id: string
+  track_id: string
+  mentee_id: string
+  mentor_id: string | null
+  status: 'active' | 'completed' | 'dropped'
+  enrolled_at: string
+  completed_at: string | null
+}
+
+export interface Page {
+  id: string
+  organization_id: string
+  slug: string
+  title_en: string
+  title_zh: string | null
+  title_ms: string | null
+  title_ta: string | null
+  published: boolean
+  created_at: string
+  updated_at: string
+}
