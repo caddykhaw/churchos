@@ -2,15 +2,19 @@ export interface OrganizationSummary {
   id: string
   slug: string
   name: string
-  subscription_status: 'trial' | 'active' | 'suspended' | 'cancelled'
+  subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
+  is_demo?: boolean
   subscribed_modules?: string[]
   subscription_tier?: 'starter' | 'growth' | 'pro'
-  trial_ends_at?: string | null
   roles?: string[]
 }
 
 export interface AuthMeResponse {
   authenticated: boolean
+  user?: {
+    id: string
+    email: string
+  }
   organizations: OrganizationSummary[]
   currentOrg: OrganizationSummary | null
 }
@@ -18,6 +22,7 @@ export interface AuthMeResponse {
 export function useOrg() {
   const currentOrg = useState<OrganizationSummary | null>('currentOrg', () => null)
   const userOrgs = useState<OrganizationSummary[]>('userOrgs', () => [])
+  const currentUserEmail = useState<string | null>('currentUserEmail', () => null)
 
   async function loadUserOrgs() {
     const data = await $fetch<AuthMeResponse>('/api/auth/me')
@@ -25,9 +30,11 @@ export function useOrg() {
     if (data.authenticated) {
       userOrgs.value = data.organizations || []
       currentOrg.value = data.currentOrg || userOrgs.value[0] || null
+      currentUserEmail.value = data.user?.email || null
     } else {
       userOrgs.value = []
       currentOrg.value = null
+      currentUserEmail.value = null
     }
   }
 
@@ -43,7 +50,22 @@ export function useOrg() {
   return {
     currentOrg: readonly(currentOrg),
     userOrgs: readonly(userOrgs),
+    currentUserEmail: readonly(currentUserEmail),
     loadUserOrgs,
     selectOrg,
   }
+}
+
+/**
+ * Demo role lens. The demo sandbox grants every role; the visitor picks which
+ * role's view they want to preview. This is a UI-only cookie — it never
+ * re-authenticates, so sandbox edits survive role switching.
+ */
+export type DemoRole = 'admin' | 'member' | 'mentor' | 'volunteer'
+
+export const DEMO_ROLES: DemoRole[] = ['admin', 'member', 'mentor', 'volunteer']
+
+export function useDemoRole() {
+  const role = useCookie<DemoRole>('__demo_role', { default: () => 'admin' })
+  return { demoRole: role }
 }

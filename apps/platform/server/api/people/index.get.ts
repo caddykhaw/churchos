@@ -3,8 +3,8 @@ import { useSupabaseAdmin } from '../../utils/supabase'
 
 /**
  * Lists members for the current organization, optionally filtered by name
- * or email search. Members are only visible to orgs with the PEOPLE module
- * (or any org during trial).
+ * or email search. Members are only visible to active orgs subscribed to the
+ * PEOPLE module (demo sandboxes always include it).
  */
 export default defineEventHandler(async (event) => {
   const org = requireModule(event, 'people')

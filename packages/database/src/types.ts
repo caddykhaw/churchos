@@ -8,7 +8,8 @@ export interface Organization {
   billing_cycle: 'monthly' | 'annual'
   subscribed_modules: string[]
   trial_ends_at: string | null
-  subscription_status: 'trial' | 'active' | 'suspended' | 'cancelled'
+  subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
+  is_demo: boolean
   suspended_at: string | null
   suspension_months: number
   created_at: string

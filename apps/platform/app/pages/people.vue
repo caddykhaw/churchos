@@ -7,12 +7,12 @@
     </header>
 
     <div v-if="locked" class="empty-state">
-      <h2 class="display">People isn't in your plan</h2>
+      <h2 class="display">People isn't available yet</h2>
       <p class="muted">
-        Your subscription doesn't include the PEOPLE module. Add it to start managing members.
+        {{ lockedMessage }}
       </p>
       <div class="actions">
-        <NuxtLink to="/account/billing" class="btn btn-primary">Manage modules</NuxtLink>
+        <NuxtLink to="/account/billing" class="btn btn-primary">Plan &amp; workspace</NuxtLink>
       </div>
     </div>
 
@@ -135,6 +135,7 @@ definePageMeta({ middleware: 'auth' })
 const loading = ref(true)
 const error = ref('')
 const locked = ref(false)
+const lockedMessage = ref("Your workspace isn't active yet. Activate your plan to use this module.")
 const members = ref<Member[]>([])
 const search = ref('')
 const showForm = ref(false)
@@ -176,6 +177,8 @@ async function loadMembers() {
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'statusCode' in err && err.statusCode === 403) {
       locked.value = true
+      const message = errorMessage(err, '')
+      if (message) lockedMessage.value = message
     } else {
       error.value = errorMessage(err, 'Failed to load members')
     }

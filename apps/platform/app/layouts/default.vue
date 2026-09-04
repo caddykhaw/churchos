@@ -1,7 +1,7 @@
 <template>
   <div class="shell">
     <aside class="sidebar">
-      <NuxtLink to="/dashboard" class="sidebar-brand" aria-label="ChurchOS dashboard">
+      <NuxtLink :to="brandHref" class="sidebar-brand" aria-label="ChurchOS dashboard">
         <span class="brand-mark" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
             <path d="M7 1 L13 13 H1 Z" />
@@ -15,20 +15,8 @@
 
       <nav class="side-nav" aria-label="Main navigation">
         <span class="side-nav-label">Workspace</span>
-        <NuxtLink to="/dashboard" class="side-link">
-          Dashboard
-        </NuxtLink>
-        <NuxtLink to="/people" class="side-link">
-          People
-        </NuxtLink>
-        <NuxtLink to="/journey" class="side-link">
-          Journey
-        </NuxtLink>
-        <NuxtLink to="/pages" class="side-link">
-          Pages
-        </NuxtLink>
-        <NuxtLink to="/account/billing" class="side-link">
-          Billing
+        <NuxtLink v-for="item in visibleNav" :key="item.to" :to="item.to" class="side-link">
+          {{ item.label }}
         </NuxtLink>
       </nav>
 
@@ -37,23 +25,73 @@
           churchos.my
         </a>
         <button class="side-foot-link" style="background:none;border:0;cursor:pointer" @click="signOut">
-          Sign out
+          {{ isDemoOrg ? 'End demo' : 'Sign out' }}
         </button>
       </div>
     </aside>
 
     <main class="main">
-      <TrialBanner v-if="currentOrg?.subscription_status === 'trial'" />
+      <DemoBanner v-if="isDemoOrg" />
       <slot />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useDemoRole } from '../composables/useOrg'
+
 const { currentOrg } = useOrg()
+const { demoRole } = useDemoRole()
+
+const isDemoOrg = computed(() => Boolean(currentOrg.value?.is_demo))
+
+const brandHref = computed(() => (isDemoOrg.value ? '/dashboard' : '/dashboard'))
+
+// Nav is role-filtered inside the demo so visitors can preview each view;
+// for real workspaces every member of the org sees the full app.
+const visibleNav = computed(() => {
+  if (!isDemoOrg.value) {
+    return [
+      { to: '/dashboard', label: 'Dashboard' },
+      { to: '/people', label: 'People' },
+      { to: '/journey', label: 'Journey' },
+      { to: '/pages', label: 'Pages' },
+      { to: '/account/billing', label: 'Plan & workspace' }
+    ]
+  }
+
+  switch (demoRole.value) {
+    case 'member':
+      return [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/people', label: 'People' }
+      ]
+    case 'mentor':
+      return [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/people', label: 'People' },
+        { to: '/journey', label: 'Journey' }
+      ]
+    case 'volunteer':
+      return [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/people', label: 'People' },
+        { to: '/pages', label: 'Pages' }
+      ]
+    default:
+      // admin: the full app.
+      return [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/people', label: 'People' },
+        { to: '/journey', label: 'Journey' },
+        { to: '/pages', label: 'Pages' },
+        { to: '/account/billing', label: 'Plan & workspace' }
+      ]
+  }
+})
 
 async function signOut() {
   await $fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
-  await navigateTo('/auth/login')
+  await navigateTo(isDemoOrg.value ? '/auth/demo' : '/auth/login')
 }
 </script>

@@ -2,7 +2,7 @@ import type { Organization, OrganizationMember } from '@churchos/database'
 import { requireAuth } from '../../utils/auth'
 import { useSupabaseAdmin } from '../../utils/supabase'
 
-type Membership = OrganizationMember & { organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'trial_ends_at'> }
+type Membership = OrganizationMember & { organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'is_demo'> }
 
 /**
  * Returns the full organizations row for the caller's current org context.

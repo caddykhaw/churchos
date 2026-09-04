@@ -7,12 +7,12 @@
     </header>
 
     <div v-if="locked" class="empty-state">
-      <h2 class="display">Pages isn't in your plan</h2>
+      <h2 class="display">Pages isn't available yet</h2>
       <p class="muted">
-        Your subscription doesn't include the PAGES module. Add it to start building your church website.
+        {{ lockedMessage }}
       </p>
       <div class="actions">
-        <NuxtLink to="/account/billing" class="btn btn-primary">Manage modules</NuxtLink>
+        <NuxtLink to="/account/billing" class="btn btn-primary">Plan &amp; workspace</NuxtLink>
       </div>
     </div>
 
@@ -126,6 +126,7 @@ definePageMeta({ middleware: 'auth' })
 const loading = ref(true)
 const error = ref('')
 const locked = ref(false)
+const lockedMessage = ref("Your workspace isn't active yet. Activate your plan to use this module.")
 const pages = ref<Page[]>([])
 const showForm = ref(false)
 const creating = ref(false)
@@ -151,6 +152,8 @@ async function loadPages() {
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'statusCode' in err && err.statusCode === 403) {
       locked.value = true
+      const message = errorMessage(err, '')
+      if (message) lockedMessage.value = message
     } else {
       error.value = errorMessage(err, 'Failed to load pages')
     }

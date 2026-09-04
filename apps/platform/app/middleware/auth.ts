@@ -13,6 +13,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Hydrate shared org state so layouts/pages render server-side data.
   const currentOrg = useState<OrganizationSummary | null>('currentOrg', () => null)
   const userOrgs = useState<OrganizationSummary[]>('userOrgs', () => [])
+  const currentUserEmail = useState<string | null>('currentUserEmail', () => null)
 
   if (me.currentOrg) {
     currentOrg.value = me.currentOrg
@@ -20,9 +21,18 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (me.organizations?.length) {
     userOrgs.value = me.organizations
   }
+  currentUserEmail.value = me.user?.email || null
 
-  // Free-trial flow: a brand-new account must set up its church before the dashboard.
-  if (!userOrgs.value.length && to.path !== '/organizations/new') {
+  const config = useRuntimeConfig()
+  const isDemoAccount = Boolean(me.user?.email) && me.user!.email === String(config.public.demoEmail || '')
+
+  if (isDemoAccount) {
+    // Demo sessions enter through the demo flow, which provisions a sandbox.
+    if (!userOrgs.value.length) {
+      return navigateTo('/auth/demo')
+    }
+  } else if (!userOrgs.value.length && to.path !== '/organizations/new') {
+    // A brand-new account must set up its church workspace first.
     return navigateTo('/organizations/new')
   }
 

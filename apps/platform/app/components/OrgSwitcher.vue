@@ -1,48 +1,62 @@
 <template>
   <div class="org-switcher">
-    <button
-      v-if="currentOrg"
-      type="button"
-      class="org-trigger"
-      :aria-expanded="open"
-      aria-haspopup="menu"
-      @click="open = !open"
-    >
+    <!-- Demo sandboxes are single-workspace: show a plain readout, no
+         dropdown, no org creation. -->
+    <div v-if="isDemo && currentOrg" class="org-static">
       <span class="org-avatar" aria-hidden="true">{{ initial(currentOrg.name) }}</span>
       <span class="org-meta">
         <span class="org-name">{{ currentOrg.name }}</span>
-        <span class="org-slug">{{ currentOrg.slug }}.churchos.my</span>
+        <span class="org-slug">demo sandbox</span>
       </span>
-      <span class="org-caret" aria-hidden="true">⌄</span>
-    </button>
-
-    <NuxtLink v-else to="/organizations/new" class="btn btn-ghost btn-block btn-sm">Create organization</NuxtLink>
-
-    <div v-if="open" class="org-dropdown" role="menu">
-      <button
-        v-for="org in userOrgs"
-        :key="org.id"
-        type="button"
-        class="org-item"
-        :class="{ current: org.id === currentOrg?.id }"
-        role="menuitem"
-        @click="switchOrg(org.id)"
-      >
-        <span class="org-avatar" aria-hidden="true">{{ initial(org.name) }}</span>
-        <span class="org-meta">
-          <span class="org-name">{{ org.name }}</span>
-          <span class="org-slug">{{ org.slug }}.churchos.my</span>
-        </span>
-        <span v-if="org.id === currentOrg?.id" class="check" aria-label="Current organization">✓</span>
-      </button>
-      <NuxtLink to="/organizations/new" class="org-create" role="menuitem">+ Create new organization</NuxtLink>
     </div>
+
+    <template v-else>
+      <button
+        v-if="currentOrg"
+        type="button"
+        class="org-trigger"
+        :aria-expanded="open"
+        aria-haspopup="menu"
+        @click="open = !open"
+      >
+        <span class="org-avatar" aria-hidden="true">{{ initial(currentOrg.name) }}</span>
+        <span class="org-meta">
+          <span class="org-name">{{ currentOrg.name }}</span>
+          <span class="org-slug">{{ currentOrg.slug }}.churchos.my</span>
+        </span>
+        <span class="org-caret" aria-hidden="true">⌄</span>
+      </button>
+
+      <NuxtLink v-else to="/organizations/new" class="btn btn-ghost btn-block btn-sm">Create organization</NuxtLink>
+
+      <div v-if="open" class="org-dropdown" role="menu">
+        <button
+          v-for="org in userOrgs"
+          :key="org.id"
+          type="button"
+          class="org-item"
+          :class="{ current: org.id === currentOrg?.id }"
+          role="menuitem"
+          @click="switchOrg(org.id)"
+        >
+          <span class="org-avatar" aria-hidden="true">{{ initial(org.name) }}</span>
+          <span class="org-meta">
+            <span class="org-name">{{ org.name }}</span>
+            <span class="org-slug">{{ org.slug }}.churchos.my</span>
+          </span>
+          <span v-if="org.id === currentOrg?.id" class="check" aria-label="Current organization">✓</span>
+        </button>
+        <NuxtLink to="/organizations/new" class="org-create" role="menuitem">+ Create new organization</NuxtLink>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 const open = ref(false)
 const { currentOrg, userOrgs, loadUserOrgs, selectOrg } = useOrg()
+
+const isDemo = computed(() => Boolean(currentOrg.value?.is_demo))
 
 function initial(name: string) {
   return name.charAt(0).toUpperCase()

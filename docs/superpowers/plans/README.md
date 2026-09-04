@@ -113,30 +113,19 @@ Plans should be executed in sequence as each builds on the previous:
 
 ---
 
-### 🔜 Plan 5: Billing & Subscriptions
-**File:** `2026-08-25-billing-subscriptions.md` (to be written)  
-**Duration:** 2-3 weeks  
-**Delivers:**
-- Stripe integration (checkout, webhooks)
-- Subscription management (trials, active, suspended, cancelled)
-- Module access gating (requireModule middleware)
-- Pricing page UI
-- Billing dashboard (invoices, payment history)
-- Cron job for subscription checks (trial expiration, grace period)
-- Reactivation fee calculation
+### 🔜 Plan 5: Owner-led Activation & Billing (on hold)
+**Status:** Superseded by the demo-first model — there is no self-serve trial or Stripe checkout yet. Workspaces start `inactive` and are activated when a plan is arranged; prospects explore via the public demo sandbox (`is_demo` orgs). Revisit when the owner wants self-serve payments.
+
+**Delivers (when picked up):**
+- Workspace activation flow (inactive → active)
+- Module access gating (requireModule middleware — already live)
+- Billing dashboard (invoices, history)
 - Email notifications (Resend integration)
 
-**Prerequisites:**
-- Plan 1 complete (orgs with subscription_status)
-- Plans 2-4 complete (modules to subscribe to)
-
 **Key Tasks:**
-1. Database migrations (subscriptions, payment_history + RLS)
-2. Stripe Checkout integration
-3. Webhook handler (checkout.session.completed, invoice.*)
-4. Pricing page UI
-5. Billing dashboard UI
-6. Cron job (Cloudflare Workers Cron Trigger)
+1. Activation UI + admin controls
+2. Payment integration (when ready)
+3. Cron job for suspension checks (no trial logic)
 7. Email templates (Resend)
 8. Reactivation flow
 

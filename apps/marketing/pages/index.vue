@@ -45,11 +45,15 @@ const features = [
   }
 ]
 
+const DEMO_URL = 'https://app.churchos.my/auth/demo'
+const SIGNUP_URL = 'https://app.churchos.my/auth/signup'
+const LOGIN_URL = 'https://app.churchos.my/auth/login'
+
 const stats = [
   { num: '3', label: 'Modules — People, Journey, Pages' },
   { num: '4', label: 'Languages — EN, 中文, BM, தமிழ்' },
   { num: '1', label: 'Church per workspace, zero data mixing' },
-  { num: '14', label: 'Day free trial, no card required' }
+  { num: '100%', label: 'Of the product, open in the live demo' }
 ]
 
 /* Pricing data (MYR, matches docs + Stripe checkout). Annual = monthly × 12 × 0.7. */
@@ -186,8 +190,8 @@ function charDelay(i: number) {
         </nav>
 
         <div class="nav-actions">
-          <a href="https://app.churchos.my/auth/login" class="btn btn-ghost btn-sm">Sign in</a>
-          <a href="https://app.churchos.my/auth/signup" class="btn btn-primary btn-sm">Start free trial</a>
+          <a :href="LOGIN_URL" class="btn btn-ghost btn-sm">Sign in</a>
+          <a :href="DEMO_URL" class="btn btn-primary btn-sm">Try the demo</a>
           <button class="nav-mobile-toggle" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Toggle menu">
             {{ mobileMenuOpen ? '✕' : '☰' }}
           </button>
@@ -218,13 +222,13 @@ function charDelay(i: number) {
           in one system — so the admin gets done and you get back to ministry.
         </p>
         <div class="hero-actions">
-          <a href="https://app.churchos.my/auth/signup" class="btn btn-primary">Start your 14-day trial</a>
+          <a :href="DEMO_URL" class="btn btn-primary">Try the live demo</a>
           <a href="#modules" class="btn btn-ghost">See the modules</a>
           <button class="btn btn-icon" @click="replayShutter" aria-label="Replay headline animation" title="Replay">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
           </button>
         </div>
-        <p class="hero-note">No credit card during trial · Full access to all modules</p>
+        <p class="hero-note">Free demo sandbox · Full access · Changes reset when you leave</p>
       </div>
     </section>
 
@@ -362,7 +366,7 @@ function charDelay(i: number) {
                 </li>
               </ul>
 
-              <a href="https://app.churchos.my/auth/signup" class="price-cta">Start with {{ m.name }} →</a>
+              <a :href="DEMO_URL" class="price-cta">Try {{ m.name }} in the demo →</a>
             </div>
           </article>
 
@@ -404,14 +408,14 @@ function charDelay(i: number) {
                 </li>
               </ul>
 
-              <a href="https://app.churchos.my/auth/signup" class="price-cta">Start free trial →</a>
+              <a :href="DEMO_URL" class="price-cta">Try the demo →</a>
             </div>
           </article>
         </div>
 
         <p class="pricing-note">
-          14-day free trial on every plan. Annual billing is 30% off the monthly total.
-          After a trial ends, accounts switch to read-only until reactivated.
+          Try every plan in the live demo sandbox. Annual billing is 30% off the
+          monthly total. Workspaces are activated once a plan is arranged.
         </p>
       </div>
     </section>
@@ -421,10 +425,12 @@ function charDelay(i: number) {
       <div class="container">
         <h2 class="display">Bring the admin back into order.</h2>
         <p class="lead" style="margin: 24px auto 0;">
-          Set up your church in minutes. No credit card, no sales call, no friction.
+          Explore a fully working workspace in the demo, or register your church
+          when you're ready to go live.
         </p>
-        <div style="margin-top: 40px;">
-          <a href="https://app.churchos.my/auth/signup" class="btn btn-primary">Start your free trial</a>
+        <div style="margin-top: 40px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
+          <a :href="DEMO_URL" class="btn btn-primary">Try the live demo</a>
+          <a :href="SIGNUP_URL" class="btn btn-ghost">Register your church</a>
         </div>
       </div>
     </section>
@@ -450,8 +456,9 @@ function charDelay(i: number) {
             <ul>
               <li><a href="#modules">Modules</a></li>
               <li><a href="#pricing">Pricing</a></li>
-              <li><a href="https://app.churchos.my/auth/login">Sign in</a></li>
-              <li><a href="https://app.churchos.my/auth/signup">Start free trial</a></li>
+              <li><a :href="DEMO_URL">Try the demo</a></li>
+              <li><a :href="LOGIN_URL">Sign in</a></li>
+              <li><a :href="SIGNUP_URL">Register</a></li>
             </ul>
           </div>
           <div>

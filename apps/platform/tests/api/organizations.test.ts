@@ -85,9 +85,10 @@ describe('POST /api/organizations', () => {
   it('rejects malformed slugs before querying the database', async () => {
     const admin = createAdmin()
     mocks.useSupabaseAdmin.mockReturnValue(admin)
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { demoEmail: '' } }))
     vi.stubGlobal('readBody', async () => ({ name: 'Grace Church', slug: '-leading-hyphen' }))
 
-    await expect(handler({} as never)).rejects.toSatisfy(error => {
+    await expect(handler({ context: {} } as never)).rejects.toSatisfy(error => {
       expectHttpError(error, 400, 'Slug must be 3-30 characters, lowercase letters, numbers, and hyphens only')
       return true
     })
@@ -95,9 +96,10 @@ describe('POST /api/organizations', () => {
   })
 
   it.each(['api', 'localhost'])('rejects reserved slug %s', async (slug) => {
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { demoEmail: '' } }))
     vi.stubGlobal('readBody', async () => ({ name: 'Grace Church', slug }))
 
-    await expect(handler({} as never)).rejects.toSatisfy(error => {
+    await expect(handler({ context: {} } as never)).rejects.toSatisfy(error => {
       expectHttpError(error, 400, 'This name is reserved, please choose another')
       return true
     })
@@ -106,23 +108,25 @@ describe('POST /api/organizations', () => {
   it('returns a conflict when the slug is already taken', async () => {
     const admin = createAdmin({ existing: { id: 'existing-org' } })
     mocks.useSupabaseAdmin.mockReturnValue(admin)
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { demoEmail: '' } }))
     vi.stubGlobal('readBody', async () => ({ name: 'Grace Church', slug: 'grace-church' }))
 
-    await expect(handler({} as never)).rejects.toSatisfy(error => {
+    await expect(handler({ context: {} } as never)).rejects.toSatisfy(error => {
       expectHttpError(error, 409, 'This name is already taken')
       return true
     })
     expect(admin.organizationInsert).not.toHaveBeenCalled()
   })
 
-  it('creates a trial organization, adds its creator as admin, and provisions its subdomain', async () => {
+  it('creates an inactive organization, adds its creator as admin, and provisions its subdomain', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-27T00:00:00.000Z'))
     const admin = createAdmin()
     mocks.useSupabaseAdmin.mockReturnValue(admin)
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { demoEmail: '' } }))
     vi.stubGlobal('readBody', async () => ({ name: 'Grace Church', slug: 'grace-church' }))
 
-    await expect(handler({} as never)).resolves.toEqual({
+    await expect(handler({ context: {} } as never)).resolves.toEqual({
       organization: { id: 'org-1', name: 'Grace Church', slug: 'grace-church' },
       subdomain: 'grace-church.churchos.my'
     })
@@ -132,8 +136,9 @@ describe('POST /api/organizations', () => {
       subscription_tier: 'starter',
       billing_cycle: 'monthly',
       subscribed_modules: [],
-      trial_ends_at: '2026-09-10T00:00:00.000Z',
-      subscription_status: 'trial',
+      trial_ends_at: null,
+      subscription_status: 'inactive',
+      is_demo: false,
       suspension_months: 0
     }))
     expect(admin.membershipInsert).toHaveBeenCalledWith({
@@ -148,9 +153,10 @@ describe('POST /api/organizations', () => {
   it('rolls back the organization when adding the creator as admin fails', async () => {
     const admin = createAdmin({ membershipError: { code: '23503' } })
     mocks.useSupabaseAdmin.mockReturnValue(admin)
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { demoEmail: '' } }))
     vi.stubGlobal('readBody', async () => ({ name: 'Grace Church', slug: 'grace-church' }))
 
-    await expect(handler({} as never)).rejects.toSatisfy(error => {
+    await expect(handler({ context: {} } as never)).rejects.toSatisfy(error => {
       expectHttpError(error, 500, 'Failed to add user as admin')
       return true
     })

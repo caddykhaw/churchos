@@ -50,7 +50,7 @@ const lastUpdated = 'September 2026'
             <h3 class="feature-title" style="font-size: 1.1rem; margin-bottom: 14px;">2. How We Use Your Data</h3>
             <p class="muted">
               We use data to provide the Service, authenticate your access, generate reports,
-              and communicate service-related updates (e.g., trial expiring, password resets).
+              and communicate service-related updates (e.g., account status, password resets).
               We do not use member contact details for marketing.
             </p>
           </div>

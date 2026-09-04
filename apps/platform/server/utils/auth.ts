@@ -35,10 +35,17 @@ export function requireRole(event: H3Event, role: Role) {
   }
 }
 
+/**
+ * Gates access to a module for the current org context.
+ * - Demo sandboxes always have every module (they're seeded with all three).
+ * - Suspended orgs are blocked.
+ * - Inactive orgs (registered but not yet activated) are blocked.
+ * - Active orgs must subscribe to the module they're asking for.
+ */
 export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pages') {
   const org = requireOrg(event)
 
-  if (org.subscription_status === 'trial') {
+  if (org.is_demo) {
     return org
   }
 
@@ -46,6 +53,13 @@ export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pa
     throw createError({
       statusCode: 402,
       message: 'Subscription suspended. Please contact support.'
+    })
+  }
+
+  if (org.subscription_status !== 'active') {
+    throw createError({
+      statusCode: 403,
+      message: 'This workspace is inactive. Activate your plan to use this module.'
     })
   }
 

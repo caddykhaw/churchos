@@ -28,17 +28,20 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    // Server-only (never exposed to client)
-    stripeSecret: '',
-    stripeWebhookSecret: '',
+    // Server-only (never exposed to client). The admin client (service role)
+    // reads these top-level keys; declare them so process.env actually maps in.
+    supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'http://localhost:38080',
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || process.env.NUXT_SUPABASE_SERVICE_KEY || '',
     resendApiKey: '',
     // Public keys (exposed to client)
     public: {
-      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
       platformUrl: process.env.PLATFORM_URL || 'https://app.churchos.my',
       marketingUrl: process.env.MARKETING_URL || 'https://churchos.my',
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'http://localhost:38080',
       supabaseAnonKey: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+      // Public demo-sandbox credentials (shown on the demo login page).
+      demoEmail: process.env.DEMO_EMAIL || 'demo@churchos.my',
+      demoPassword: process.env.DEMO_PASSWORD || 'demo-pass-2026',
     }
   },
 

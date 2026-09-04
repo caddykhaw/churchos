@@ -68,9 +68,16 @@ function authClient() {
 }
 
 async function routeAfterAuth() {
+  const config = useRuntimeConfig()
   const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
-  if (me?.authenticated && me.organizations?.length) {
+  if (!me?.authenticated) {
+    await navigateTo('/auth/login')
+    return
+  }
+  if (me.organizations?.length) {
     await navigateTo('/dashboard')
+  } else if (me.user?.email === String(config.public.demoEmail || '')) {
+    await navigateTo('/auth/demo')
   } else {
     await navigateTo('/organizations/new')
   }

@@ -10,7 +10,7 @@ declare module 'h3' {
         organization_id: string
         roles: string[]
         status: string
-        organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'trial_ends_at'>
+        organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'is_demo'>
       }>
     } | null
 
@@ -18,10 +18,10 @@ declare module 'h3' {
       id: string
       slug: string
       name: string
-      subscription_status: 'trial' | 'active' | 'suspended' | 'cancelled'
+      subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
       subscribed_modules: string[]
       subscription_tier: 'starter' | 'growth' | 'pro'
-      trial_ends_at: string | null
+      is_demo: boolean
       userRoles: string[]
     } | null
   }

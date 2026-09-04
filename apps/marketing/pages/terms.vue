@@ -67,13 +67,17 @@ const lastUpdated = 'September 2026'
           </div>
 
           <div>
-            <h3 class="feature-title" style="font-size: 1.1rem; margin-bottom: 14px;">4. Trial & Billing</h3>
+            <h3 class="feature-title" style="font-size: 1.1rem; margin-bottom: 14px;">4. Demo Access & Billing</h3>
             <p class="muted">
-              New accounts receive a 14-day free trial with full access to all modules.
-              No credit card is required during the trial. After the trial, your account
-              switches to read-only until a paid plan is selected. You may cancel your
-              subscription at any time, which will take effect at the end of the current
-              billing cycle.
+              ChurchOS offers a public demo sandbox: a fully working workspace
+              pre-loaded with sample data that anyone may explore. Demo workspaces are
+              temporary — changes made inside the demo reset when you sign out and are
+              never treated as production data.
+            </p>
+            <p class="muted" style="margin-top: 12px;">
+              Registered workspaces are activated once a plan is arranged. Details of
+              your plan, modules, and billing cycle are confirmed at activation. You may
+              cancel at any time.
             </p>
           </div>
 

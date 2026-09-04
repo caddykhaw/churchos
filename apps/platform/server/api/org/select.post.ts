@@ -4,7 +4,7 @@ import { requireAuth } from '../../utils/auth'
 const ORG_COOKIE = '__org_id'
 const ORG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year
 
-type Membership = OrganizationMember & { organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'trial_ends_at'> }
+type Membership = OrganizationMember & { organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'is_demo'> }
 
 /**
  * Persists the caller's currently selected organization in an httpOnly cookie.

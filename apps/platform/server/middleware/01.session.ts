@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
           subscription_status,
           subscribed_modules,
           subscription_tier,
-          trial_ends_at
+          is_demo
         )
       `)
       .eq('user_id', user.id)

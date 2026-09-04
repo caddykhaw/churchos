@@ -124,9 +124,10 @@ describe('auth API endpoints', () => {
     expect(globalThis.setCookie).not.toHaveBeenCalled()
   })
 
-  it('deletes the session cookie on logout', () => {
-    expect(logout({} as never)).toEqual({ success: true })
+  it('deletes the session cookie on logout', async () => {
+    await expect(logout({ context: {} } as never)).resolves.toEqual({ success: true })
     expect(globalThis.deleteCookie).toHaveBeenCalledWith(expect.anything(), '__session', { path: '/' })
+    expect(globalThis.deleteCookie).toHaveBeenCalledWith(expect.anything(), '__org_id', { path: '/' })
   })
 
   it('stores a protected session cookie after client-side authentication', async () => {
@@ -179,7 +180,7 @@ describe('auth API endpoints', () => {
       context: {
         user: {
           id: 'user-1', email: 'member@example.com', profile: { id: 'user-1' },
-          organizations: [{ roles: ['admin'], organizations: { id: 'org-1', slug: 'grace', name: 'Grace Church', subscription_status: 'trial' } }]
+          organizations: [{ roles: ['admin'], organizations: { id: 'org-1', slug: 'grace', name: 'Grace Church', subscription_status: 'inactive', is_demo: false } }]
         },
         org: { id: 'org-1', slug: 'grace' }
       }
@@ -188,7 +189,7 @@ describe('auth API endpoints', () => {
     expect(me(event as never)).toEqual({
       authenticated: true,
       user: { id: 'user-1', email: 'member@example.com', profile: { id: 'user-1' } },
-      organizations: [{ id: 'org-1', slug: 'grace', name: 'Grace Church', subscription_status: 'trial', roles: ['admin'] }],
+      organizations: [{ id: 'org-1', slug: 'grace', name: 'Grace Church', subscription_status: 'inactive', is_demo: false, roles: ['admin'] }],
       currentOrg: { id: 'org-1', slug: 'grace' }
     })
   })

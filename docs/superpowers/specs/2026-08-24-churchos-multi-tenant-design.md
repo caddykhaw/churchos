@@ -14,7 +14,7 @@ ChurchOS is a multi-tenant SaaS platform for Malaysian churches, offering modula
 
 ## Success outcome
 
-A church can register → receive instant subdomain → access 14-day free trial → subscribe to individual modules (PEOPLE, JOURNEY, PAGES) → manage members → run discipleship programs → publish a people-centric website. Users can belong to multiple churches, switch between them via dropdown, and carry JOURNEY certificates across organizations. The system serves 50-100 churches on a single VPS (4 vCPU, 7.8GB RAM) with self-hosted Supabase.
+A prospective church explores the full product in a public demo sandbox (every visitor gets an isolated, pre-seeded workspace that resets when they sign out) → a church registers → receives an instant subdomain with an `inactive` workspace → the workspace is activated once a plan is arranged → subscribe to individual modules (PEOPLE, JOURNEY, PAGES) → manage members → run discipleship programs → publish a people-centric website. Users can belong to multiple churches, switch between them via dropdown, and carry JOURNEY certificates across organizations. The system serves 50-100 churches on a single VPS (4 vCPU, 7.8GB RAM) with self-hosted Supabase.
 
 ## Product scope
 
@@ -128,8 +128,8 @@ All tables (except global lookup tables) include `organization_id`. RLS policies
 - `subscription_tier` TEXT (starter/growth/pro)
 - `billing_cycle` TEXT (monthly/annual)
 - `subscribed_modules` TEXT[]
-- `trial_ends_at` TIMESTAMPTZ
-- `subscription_status` TEXT (trial/active/suspended/cancelled)
+- `is_demo` BOOLEAN (demo sandboxes)
+- `subscription_status` TEXT (inactive/active/suspended/cancelled) — `trial_ends_at` retained for legacy rows only
 - `suspended_at` TIMESTAMPTZ
 - `suspension_months` INTEGER
 
@@ -395,30 +395,28 @@ USING (
 - Pro: RM 746/mo or RM 6,263/year
 - **Includes: Free custom domain (1 year) + all languages**
 
-### Subscription lifecycle
+### Workspace lifecycle
 
-1. **Trial (14 days):** All modules unlocked, no payment
-2. **Trial expires:** Status → `suspended`, read-only access
-3. **Active subscription:** Status → `active`, modules accessible
-4. **Payment fails:** Grace period 7 days, then suspended
-5. **Suspended:** Reactivation fee = RM 10 × `suspension_months`
-6. **Cancelled:** Data retained 30 days, then archived
+1. **Register (self-serve):** Account created, church workspace provisioned with status `inactive` — no automatic trial
+2. **Activation (owner-arranged):** Workspace moves to `active` when a plan is agreed; `subscribed_modules` unlocks the bought modules
+3. **Suspended:** Payment/reactivation issue; read-only access
+4. **Cancelled:** Data retained 30 days, then archived
 
-### Frontend gating
+### Demo sandbox (prospect exploration)
 
-```typescript
-// composables/useSubscription.ts
-function hasModule(module: 'people' | 'journey' | 'pages'): boolean {
-  if (!currentOrg.value) return false
-  if (currentOrg.value.subscription_status === 'trial') return true
-  if (currentOrg.value.subscription_status === 'suspended') return false
-  return currentOrg.value.subscribed_modules.includes(module)
-}
-```
+There is no free trial. Prospective churches explore through a **public demo sandbox** at `app.churchos.my/auth/demo`:
+
+- A shared demo auth account with public credentials shown on the demo page
+- Every visitor who enters gets a **fresh, isolated sandbox org** (`is_demo = true`) pre-seeded with sample members, tracks, enrollments, and pages
+- Sandboxes are fully editable (all modules, all roles) but can never create a new organization
+- A demo banner offers an in-app role switcher (admin/member/mentor/volunteer) so prospects can preview each view without logging out
+- Signing out deletes the sandbox and everything changed inside it; abandoned sandboxes are swept after 24h
+
+Demo orgs are `is_demo = true`, always `active`, subscribed to every module, and invisible to billing.
 
 ### Backend gating
 
-Every module API endpoint calls `requireModule(event, 'module-name')` before processing.
+Every module API endpoint calls `requireModule(event, 'module-name')` before processing. Demo sandboxes pass all module gates; inactive workspaces are blocked until activated.
 
 ---
 
@@ -429,7 +427,7 @@ Every module API endpoint calls `requireModule(event, 'module-name')` before pro
 1. User signs up, chooses slug (e.g., "firstchurch")
 2. Validate slug format: `^[a-z0-9-]{3,30}$`, check reserved words
 3. Check availability in `organizations.slug`
-4. Create organization record with trial
+4. Create organization record with status `inactive`
 5. Cloudflare API: Create CNAME `firstchurch.churchos.my → churchos.my` (proxied, → Pages)
 6. User redirected to subdomain
 
@@ -574,7 +572,7 @@ Handles events:
 
 ### Cron job (daily at 2 AM UTC)
 
-1. Check expired trials → suspend
+1. Sweep abandoned demo sandboxes (>24h)
 2. Check past_due subscriptions past grace period → suspend
 3. Increment `suspension_months`
 4. Send notification emails
@@ -774,7 +772,7 @@ Churches browse and install plugins from marketplace UI. Plugins:
 2. Members CRUD UI (list, view, create, edit)
 3. Invitation system (email invites via Resend)
 4. Member roles management (admin, member, volunteer)
-5. Trial expiration check + notifications
+5. Demo sandbox sweep (abandoned >24h)
 6. Subscription status display
 7. Module access checks (requireModule helper)
 
@@ -820,7 +818,7 @@ Churches browse and install plugins from marketplace UI. Plugins:
 5. Billing dashboard (subscription status, invoices)
 6. Cron job for subscription checks
 7. Reactivation fee calculation
-8. Email notifications (trial expiring, payment failed, suspended)
+8. Email notifications (suspended, cancelled)
 
 ### Phase 6: Polish & Launch (Weeks 21-22)
 
@@ -854,7 +852,7 @@ Churches browse and install plugins from marketplace UI. Plugins:
 
 ChurchOS Phase 1 is ready when:
 
-1. Church can register → receive subdomain → 14-day trial active
+1. Church can register → receive subdomain → workspace inactive until activated (no trial)
 2. Admin can invite members via email
 3. Members can join JOURNEY track with mentor assignment
 4. Mentor can review lessons, mentee can progress

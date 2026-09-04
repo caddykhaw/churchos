@@ -47,7 +47,8 @@ services:
     ports:
       - "38080:3000"
     environment:
-      # URL-encode the password (base64 contains / and = which break the URI)
+      # URL-encode the password (base64 contains / and = which break the URI).
+      # POSTGRES_PASSWORD_ENCODED lives in docker/.env (gitignored).
       PGRST_DB_URI: "postgres://postgres:${POSTGRES_PASSWORD_ENCODED}@db:5432/postgres"
       PGRST_DB_SCHEMAS: public,storage
       PGRST_DB_ANON_ROLE: anon
@@ -58,6 +59,43 @@ services:
       default:
         aliases:
           - rest
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # supabase/gotrue image serves the /auth/v1 API the app's Supabase client
+  # calls (sign-in, /auth/v1/user session verification). The supabase/postgres
+  # image already ships the auth schema + supabase_auth_admin role, so GoTrue
+  # only needs DB credentials. HTTP is fine locally; TLS terminates upstream
+  # in production.
+  auth:
+    image: supabase/gotrue:v2.196.0
+    container_name: churchos-auth
+    restart: unless-stopped
+    ports:
+      - "38081:9999"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:38081
+      GOTRUE_SITE_URL: http://localhost:3000
+      # supabase_auth_admin is a NOLOGIN-by-default reserved role. This stack sets
+      # its password to 'postgres' once via supabase_admin so GoTrue can connect.
+      # Local dev only.
+      DATABASE_URL: "postgres://supabase_auth_admin:postgres@db:5432/postgres"
+      GOTRUE_DB_DRIVER: postgres
+      # Legacy HS256 mode — MUST match the JWT_SECRET that anon/service API keys
+      # are signed with and that PostgREST verifies (PGRST_JWT_SECRET). Do NOT
+      # configure GOTRUE_JWT_KEYS (RS256) here: with RSA keys GoTrue rejects the
+      # HS256-signed service key on every admin API call.
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMS_AUTOCONFIRM: "false"
+      GOTRUE_SITE_INVITE_ONLY: "false"
+      GOTRUE_DISABLE_SIGNUP: "false"
     depends_on:
       db:
         condition: service_healthy

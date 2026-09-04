@@ -25,6 +25,17 @@ function isUniqueViolation(error: unknown): boolean {
 
 export default defineEventHandler(async (event) => {
   const user = requireAuth(event)
+
+  // The shared demo account may not create its own workspaces — it explores
+  // isolated sandbox orgs provisioned by the demo flow.
+  const config = useRuntimeConfig()
+  if (event.context.org?.is_demo || user.email === String(config.public.demoEmail || '')) {
+    throw createError({
+      statusCode: 403,
+      message: 'Organization creation is disabled in the demo sandbox'
+    })
+  }
+
   const body = await readBody<{ name?: unknown, slug?: unknown }>(event)
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   const slug = typeof body?.slug === 'string' ? body.slug : ''
@@ -72,9 +83,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const trialEndsAt = new Date()
-  trialEndsAt.setDate(trialEndsAt.getDate() + 14)
-
   const { data: organization, error: organizationError } = await admin
     .from('organizations')
     .insert({
@@ -83,8 +91,9 @@ export default defineEventHandler(async (event) => {
       subscription_tier: 'starter',
       billing_cycle: 'monthly',
       subscribed_modules: [],
-      trial_ends_at: trialEndsAt.toISOString(),
-      subscription_status: 'trial',
+      trial_ends_at: null,
+      subscription_status: 'inactive',
+      is_demo: false,
       suspension_months: 0
     })
     .select()

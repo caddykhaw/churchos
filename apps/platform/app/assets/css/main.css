@@ -343,8 +343,8 @@ h2.display { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; }
 }
 .org-create:hover { color: var(--text); }
 
-/* ── Trial banner ──────────────────────────────────────────── */
-.trial-banner {
+/* ── Demo sandbox banner ───────────────────────────────────── */
+.demo-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -352,15 +352,94 @@ h2.display { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; }
   flex-wrap: wrap;
   padding: 12px 16px;
   margin-bottom: 28px;
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  border: 1px solid rgba(167, 139, 250, 0.35);
   border-radius: var(--r-md);
-  background: rgba(251, 191, 36, 0.06);
-  color: #fde68a;
-  font-size: 0.9rem;
+  background: rgba(124, 108, 240, 0.08);
+  color: var(--text-2);
+  font-size: 0.88rem;
 }
-.trial-banner strong { color: #fbbf24; font-weight: 600; }
-.trial-banner .btn { color: #0a0a0a; background: var(--amber); }
-.trial-banner .btn:hover { background: #fcd34d; }
+.demo-banner__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.demo-banner__badge {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.5);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.demo-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.demo-role-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-right: 2px;
+}
+.demo-role-select {
+  width: auto;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+}
+
+/* Demo credentials card (auth/demo) */
+.demo-creds {
+  display: grid;
+  gap: 1px;
+  background: var(--border-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin: 0 0 18px;
+}
+.demo-creds__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--surface-2);
+  padding: 10px 14px;
+  font-size: 0.875rem;
+}
+.demo-creds__label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.demo-creds__value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+/* Demo org switcher readout */
+.org-static {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  background: transparent;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-sm);
+}
+.org-static .org-avatar {
+  background: linear-gradient(135deg, var(--fuchsia), var(--violet));
+}
+.org-static .org-slug { color: var(--violet-2); }
 
 /* ── Cards / stats ─────────────────────────────────────────── */
 .card {
@@ -378,7 +457,7 @@ h2.display { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; }
 .stat-sub { font-size: 0.8rem; color: var(--text-3); margin-top: 4px; }
 
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
-.status-dot.trial { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.status-dot.inactive { background: var(--text-4); box-shadow: 0 0 8px var(--text-4); }
 .status-dot.active { background: var(--emerald); box-shadow: 0 0 8px var(--emerald); }
 .status-dot.suspended, .status-dot.cancelled { background: #f87171; box-shadow: 0 0 8px #f87171; }
 

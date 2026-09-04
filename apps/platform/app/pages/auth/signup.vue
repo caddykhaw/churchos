@@ -11,10 +11,10 @@
         ChurchOS
       </NuxtLink>
 
-      <h1 id="signup-title" class="display auth-title">Start your 14-day trial</h1>
+      <h1 id="signup-title" class="display auth-title">Create your account</h1>
       <p class="auth-sub">
-        Create your account — no credit card required. Next you'll set up your
-        church workspace.
+        Register your church workspace. It activates once your plan is
+        arranged — or try the demo sandbox first.
       </p>
 
       <form @submit.prevent="handleSignup">
@@ -45,6 +45,9 @@
       <nav class="auth-links" aria-label="Authentication options">
         <NuxtLink to="/auth/login">Already have an account? Sign in</NuxtLink>
       </nav>
+      <p class="field-hint" style="text-align:center; margin-top: 14px;">
+        Just exploring? <NuxtLink to="/auth/demo" style="text-decoration:underline;">Open the demo sandbox</NuxtLink> — no account needed.
+      </p>
     </section>
   </main>
 </template>
@@ -71,11 +74,19 @@ function errorMessage(err: unknown, fallback: string) {
 }
 
 async function routeAfterAuth() {
+  const config = useRuntimeConfig()
   const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
-  if (me?.authenticated && me.organizations?.length) {
+  if (!me?.authenticated) {
+    await navigateTo('/auth/login')
+    return
+  }
+  if (me.organizations?.length) {
     await navigateTo('/dashboard')
+  } else if (me.user?.email === String(config.public.demoEmail || '')) {
+    // The shared demo account provisions its sandbox through the demo entry.
+    await navigateTo('/auth/demo')
   } else {
-    // Fresh trial accounts have no church yet — send them to the setup step.
+    // New accounts have no church yet — send them to the setup step.
     await navigateTo('/organizations/new')
   }
 }

@@ -7,8 +7,8 @@
 
       <h1 id="setup-title" class="display auth-title">Set up your church</h1>
       <p class="auth-sub">
-        Give your workspace a name and choose an address. Your 14-day free
-        trial starts the moment it's created — no credit card required.
+        Give your workspace a name and choose an address. Your workspace is
+        created ready to use and activates once your plan is arranged.
       </p>
 
       <form @submit.prevent="handleCreate">
@@ -28,11 +28,11 @@
 
         <div class="auth-actions">
           <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
-            {{ loading ? 'Creating your workspace…' : 'Start my 14-day free trial' }}
+            {{ loading ? 'Creating your workspace…' : 'Create workspace' }}
           </button>
         </div>
         <p class="field-hint" style="text-align:center; margin-top:12px;">
-          You can add People, Journey, or Pages modules later.
+          You can add People, Journey, or Pages modules once activated.
         </p>
       </form>
     </section>
@@ -44,7 +44,7 @@ import { useOrg } from '../../composables/useOrg'
 
 definePageMeta({ middleware: 'auth', layout: false })
 
-const { userOrgs, loadUserOrgs, selectOrg } = useOrg()
+const { userOrgs, loadUserOrgs, selectOrg, currentUserEmail } = useOrg()
 const name = ref('')
 const slug = ref('')
 const slugTaken = ref(false)
@@ -90,8 +90,14 @@ async function handleCreate() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Keep the switcher in sync when this page is reached directly.
-  void loadUserOrgs()
+  await loadUserOrgs()
+
+  // The shared demo account cannot create workspaces — it explores sandboxes.
+  const config = useRuntimeConfig()
+  if (currentUserEmail.value === String(config.public.demoEmail || '')) {
+    await navigateTo('/auth/demo')
+  }
 })
 </script>

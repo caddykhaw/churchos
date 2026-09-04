@@ -63,17 +63,24 @@ export default defineEventHandler(async (event) => {
   }
 
   if (fromPlatformFallback && !orgId) {
-    const memberships = event.context.user.organizations.filter(
-      (membership) => membership.status === 'active'
-    )
+    const config = useRuntimeConfig()
+    const isDemoAccount = event.context.user.email === String(config.public.demoEmail || '')
+    const cookieOrgId = getCookie(event, '__org_id')
 
-    if (memberships.length) {
-      const cookieOrgId = getCookie(event, '__org_id')
-      const selected = cookieOrgId
-        ? memberships.find((membership) => membership.organization_id === cookieOrgId)
-        : undefined
-
-      orgId = (selected ?? memberships[0]).organization_id
+    if (cookieOrgId) {
+      const selected = event.context.user.organizations.find(
+        (membership) => membership.organization_id === cookieOrgId && membership.status === 'active'
+      )
+      orgId = selected?.organization_id ?? null
+    } else if (!isDemoAccount) {
+      // Non-demo users fall back to their first active membership so a signed-in
+      // user always has an org context. The shared demo account must NOT fall
+      // back to an arbitrary sandbox — each visitor's sandbox is chosen via the
+      // __org_id cookie set by the demo entry flow.
+      const memberships = event.context.user.organizations.filter(
+        (membership) => membership.status === 'active'
+      )
+      orgId = memberships[0]?.organization_id ?? null
     }
   }
 
@@ -90,7 +97,7 @@ export default defineEventHandler(async (event) => {
         subscription_status: membership.organizations.subscription_status,
         subscribed_modules: membership.organizations.subscribed_modules,
         subscription_tier: membership.organizations.subscription_tier,
-        trial_ends_at: membership.organizations.trial_ends_at,
+        is_demo: membership.organizations.is_demo,
         userRoles: membership.roles
       }
     } else {
@@ -108,10 +115,10 @@ export type OrgContextEvent = H3Event & {
       id: string
       slug: string
       name: string
-      subscription_status: 'trial' | 'active' | 'suspended' | 'cancelled'
+      subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
       subscribed_modules: string[]
       subscription_tier: 'starter' | 'growth' | 'pro'
-      trial_ends_at: string | null
+      is_demo: boolean
       userRoles: string[]
     } | null
   }

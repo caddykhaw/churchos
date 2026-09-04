@@ -44,7 +44,7 @@
 
       <nav class="auth-links" aria-label="Authentication options">
         <NuxtLink to="/auth/signup">Create account</NuxtLink>
-        <NuxtLink to="/auth/verify-otp">Sign in with OTP</NuxtLink>
+        <NuxtLink to="/auth/demo">Try the demo</NuxtLink>
       </nav>
     </section>
   </main>
@@ -80,9 +80,16 @@ async function setSession(accessToken: string) {
 }
 
 async function routeAfterAuth() {
+  const config = useRuntimeConfig()
   const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
-  if (me?.authenticated && me.organizations?.length) {
+  if (!me?.authenticated) {
+    return
+  }
+  if (me.organizations?.length) {
     await navigateTo('/dashboard')
+  } else if (me.user?.email === String(config.public.demoEmail || '')) {
+    // Demo account without a live sandbox: back to the demo entry.
+    await navigateTo('/auth/demo')
   } else {
     await navigateTo('/organizations/new')
   }

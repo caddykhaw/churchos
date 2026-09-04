@@ -4,7 +4,7 @@ Multi-tenant SaaS for Malaysian churches. Modular Church Management System (ChMS
 
 - **Live:** `churchos.my` · `app.churchos.my` · `db.churchos.my`
 - **GitHub:** [caddykhaw/churchos](https://github.com/caddykhaw/churchos) · `main` branch
-- **CI:** 26 tests passing ✅ · Lint + Typecheck + Build on every PR
+- **CI:** 41 tests passing ✅ · Lint + Typecheck + Build on every PR
 
 ---
 
@@ -30,13 +30,13 @@ VPS (4 vCPU, 7.8 GB RAM) — self-hosted Supabase stack only
 | Layer | Technology |
 |---|---|
 | Application | Nuxt 4, Vue 3, TypeScript, Nitro (SSR) |
-| Identity | Supabase Auth (email/password, Google OAuth, mobile OTP) |
+| Identity | Supabase Auth (email/password) + shared demo account for the sandbox |
 | Database | PostgreSQL (self-hosted via Docker) |
 | Realtime | Supabase Realtime |
 | Storage | Supabase Storage |
 | Hosting | Cloudflare Pages (platform + marketing) |
 | DNS | Cloudflare API (auto-provisioned tenant subdomains) |
-| Payments | Stripe |
+| Payments | Owner-activated plans (self-serve checkout not yet enabled) |
 | Email | Resend |
 | Package manager | pnpm workspaces (monorepo) |
 
@@ -66,7 +66,9 @@ Users can belong to multiple orgs and switch via a dropdown (header). JOURNEY ce
 | PAGES | RM 79/mo (EN/ZH) | — | RM 79/mo + MS/TA |
 | **All-in-One** | RM 236/mo | RM 474/mo | RM 746/mo |
 
-All-in-One includes a free custom domain (1 year) and all languages. Trials are 14 days; after trial, status → `suspended` (read-only). Reactivation fee: RM 10 × `suspension_months`.
+All-in-One includes a free custom domain (1 year) and all languages. Workspaces are **activated when a plan is arranged** — there is no self-serve trial. Prospective churches can try the full product in the **public demo sandbox** (`app.churchos.my/auth/demo`): every visitor gets an isolated, pre-seeded workspace with all modules enabled, and the copy is deleted when they sign out.
+
+**Workspace lifecycle:** `inactive` (registered, waiting to be activated) → `active` → `suspended` / `cancelled`. Demo sandboxes are flagged `is_demo = true` and are never part of billing.
 
 ---
 
@@ -181,8 +183,8 @@ docker exec -i churchos-db psql -U postgres < supabase/migrations/20260824000001
 |---|---|
 | `20260824000001_initial_schema.sql` | Core tables: `organizations`, `profiles`, `organization_members` + helpers (`current_org_id()`, `update_updated_at()`) |
 | `20260824000002_rls_policies.sql` | RLS policies for org-isolation + role-based writes |
-
-> New modules (PEOPLE/JOURNEY/PAGES) will follow as additional migrations.
+| `20260903000002_module_tables.sql` | Module tables: `members`, `tracks`, `enrollments`, `pages` |
+| `20260903000003_demo_and_inactive.sql` | `organizations.is_demo` flag; default status `inactive`; migrate legacy `trial` rows |
 
 ---
 
@@ -225,7 +227,7 @@ pnpm test          # all workspace tests
 pnpm --filter platform test  # platform only
 ```
 
-26 tests pass across the suite (auth utils, org context, Cloudflare DNS helpers, subscription gating).
+41 tests pass across the suite (auth, org context, module APIs, subscription gating, Cloudflare DNS helpers).
 
 ---
 
