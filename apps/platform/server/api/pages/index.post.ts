@@ -12,7 +12,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 /** Creates a website page for the current organization. */
 export default defineEventHandler(async (event) => {
-  const org = requireModule(event, 'pages')
+  const org = requireModule(event, 'pages', { role: 'admin' })
   const body = await readBody<Record<string, unknown>>(event)
 
   const slug = typeof body?.slug === 'string' ? body.slug.trim().toLowerCase() : ''

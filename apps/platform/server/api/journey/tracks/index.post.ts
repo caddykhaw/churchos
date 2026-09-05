@@ -3,7 +3,7 @@ import { useSupabaseAdmin } from '../../../utils/supabase'
 
 /** Creates a discipleship track for the current organization. */
 export default defineEventHandler(async (event) => {
-  const org = requireModule(event, 'journey')
+  const org = requireModule(event, 'journey', { role: 'admin' })
   const body = await readBody<Record<string, unknown>>(event)
 
   const titleEn = typeof body?.title_en === 'string' ? body.title_en.trim() : ''

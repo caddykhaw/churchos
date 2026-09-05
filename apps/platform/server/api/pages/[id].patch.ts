@@ -1,12 +1,14 @@
 import { requireModule } from '../../utils/auth'
 import { useSupabaseAdmin } from '../../utils/supabase'
 
+const PAGE_TITLE_FIELDS = ['title_en', 'title_zh', 'title_ms', 'title_ta'] as const
+
 /**
- * Updates a website page belonging to the current organization.
- * Currently supports toggling the published flag.
+ * Updates a website page of the current organization: slug (with format
+ * validation), multilingual titles, and published state.
  */
 export default defineEventHandler(async (event) => {
-  const org = requireModule(event, 'pages')
+  const org = requireModule(event, 'pages', { role: 'admin' })
   const id = getRouterParam(event, 'id')
   const body = await readBody<Record<string, unknown>>(event)
 
@@ -15,6 +17,24 @@ export default defineEventHandler(async (event) => {
   }
 
   const patch: Record<string, unknown> = {}
+
+  if (body?.slug !== undefined) {
+    const slug = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : ''
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      throw createError({
+        statusCode: 400,
+        message: 'Slug must be lowercase letters, numbers, and hyphens (e.g. about-us)'
+      })
+    }
+    patch.slug = slug
+  }
+
+  for (const field of PAGE_TITLE_FIELDS) {
+    if (body?.[field] !== undefined) {
+      patch[field] = typeof body[field] === 'string' && body[field].trim() !== '' ? body[field].trim() : null
+    }
+  }
+
   if (body?.published !== undefined) {
     patch.published = Boolean(body.published)
   }
@@ -32,16 +52,10 @@ export default defineEventHandler(async (event) => {
     .single()
 
   if (error) {
+    // Unique violation on (organization_id, slug) or missing row.
     throw createError({
-      statusCode: 500,
-      message: 'Failed to update page'
-    })
-  }
-
-  if (!data) {
-    throw createError({
-      statusCode: 404,
-      message: 'Page not found'
+      statusCode: 409,
+      message: 'Page not found, or a page with that slug already exists'
     })
   }
 

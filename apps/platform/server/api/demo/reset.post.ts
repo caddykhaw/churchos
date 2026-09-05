@@ -1,5 +1,6 @@
 import { provisionDemoSandbox, signInDemoUser } from '../../utils/demo'
 import { useSupabaseAdmin } from '../../utils/supabase'
+import { clientKey, rateLimit } from '../../utils/rate-limit'
 
 const ORG_COOKIE = '__org_id'
 const SESSION_COOKIE = '__session'
@@ -11,6 +12,15 @@ const MAX_AGE_SECONDS = 60 * 60 * 8
  * cleanly seeded one in its place. Used from the demo banner.
  */
 export default defineEventHandler(async (event) => {
+  // Abuse guard: resets delete + reseed a full org.
+  const limit = rateLimit(clientKey(event, 'demo-reset'), 20, 60 * 60 * 1000)
+  if (!limit.allowed) {
+    throw createError({
+      statusCode: 429,
+      message: `Too many demo resets. Try again in ${limit.retryAfterSeconds} seconds.`
+    })
+  }
+
   const currentOrgId = getCookie(event, ORG_COOKIE)
 
   if (currentOrgId) {

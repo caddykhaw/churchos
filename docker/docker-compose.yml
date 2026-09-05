@@ -107,7 +107,7 @@ services:
     container_name: churchos-studio
     restart: unless-stopped
     ports:
-      - "33001:3000"
+      - "127.0.0.1:33001:3000"
     environment:
       SUPABASE_URL: http://rest:3000
       SUPABASE_ANON_KEY: ${ANON_KEY}

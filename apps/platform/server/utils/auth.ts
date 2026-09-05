@@ -41,8 +41,15 @@ export function requireRole(event: H3Event, role: Role) {
  * - Suspended orgs are blocked.
  * - Inactive orgs (registered but not yet activated) are blocked.
  * - Active orgs must subscribe to the module they're asking for.
+ * - `options.role`: additionally require the caller to hold this role in the
+ *   org (e.g. 'admin' for every mutation endpoint). Demo memberships are
+ *   seeded with all roles so demo flows are unaffected.
  */
-export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pages') {
+export function requireModule(
+  event: H3Event,
+  module: 'people' | 'journey' | 'pages',
+  options: { role?: Role } = {}
+) {
   const org = requireOrg(event)
 
   if (org.is_demo) {
@@ -67,6 +74,13 @@ export function requireModule(event: H3Event, module: 'people' | 'journey' | 'pa
     throw createError({
       statusCode: 403,
       message: `Module '${module}' not included in your subscription`
+    })
+  }
+
+  if (options.role && !org.userRoles.includes(options.role)) {
+    throw createError({
+      statusCode: 403,
+      message: `Role '${options.role}' required for this action`
     })
   }
 

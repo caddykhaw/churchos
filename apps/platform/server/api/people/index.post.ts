@@ -3,7 +3,7 @@ import { useSupabaseAdmin } from '../../utils/supabase'
 
 /** Adds a member to the current organization. */
 export default defineEventHandler(async (event) => {
-  const org = requireModule(event, 'people')
+  const org = requireModule(event, 'people', { role: 'admin' })
   const body = await readBody<Record<string, unknown>>(event)
 
   const fullName = typeof body?.full_name === 'string' ? body.full_name.trim() : ''

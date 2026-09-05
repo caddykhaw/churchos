@@ -224,7 +224,7 @@ async function seedDemoOrg(admin: AdminClient, organizationId: string) {
       email: `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
       phone: `+60 1${index + 2}-345 6789`,
       gender: index % 2 === 0 ? 'male' : 'female',
-      member_status: index < 6 ? 'active' : index === 6 ? 'pending' : 'inactive',
+      member_status: index < 6 ? 'active' : 'inactive',
       member_number: `M-${String(1001 + index)}`,
       membership_date: `2022-0${(index % 9) + 1}-15`
     })))

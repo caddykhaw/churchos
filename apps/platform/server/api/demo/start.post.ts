@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { getCurrentSandbox, provisionDemoSandbox, signInDemoUser } from '../../utils/demo'
+import { clientKey, rateLimit } from '../../utils/rate-limit'
 
 const SESSION_COOKIE = '__session'
 const ORG_COOKIE = '__org_id'
@@ -29,7 +30,21 @@ function setDemoCookies(event: H3Event, accessToken: string, orgId: string) {
  * fresh, isolated, seeded copy is provisioned for this visitor.
  */
 export default defineEventHandler(async (event) => {
-  const existing = await getCurrentSandbox(event)
+  // Abuse guard: each fresh sandbox provisions a full org + seed data, so
+  // cap unauthenticated provisioning per IP. Resuming an existing sandbox is
+  // free — the limit only applies to new sandbox creation.
+  const existingSandbox = await getCurrentSandbox(event)
+  if (!existingSandbox) {
+    const limit = rateLimit(clientKey(event, 'demo-start'), 10, 24 * 60 * 60 * 1000)
+    if (!limit.allowed) {
+      throw createError({
+        statusCode: 429,
+        message: `Too many demo workspaces created. Try again in ${limit.retryAfterSeconds} seconds.`
+      })
+    }
+  }
+
+  const existing = existingSandbox
 
   if (existing) {
     const accessToken = await signInDemoUser()

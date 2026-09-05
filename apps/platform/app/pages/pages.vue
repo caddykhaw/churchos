@@ -108,6 +108,14 @@
                   >
                     <span class="toggle__thumb" aria-hidden="true" />
                   </button>
+                  <button
+                    class="btn btn-ghost btn-sm"
+                    :aria-label="`Delete ${page.title_en}`"
+                    :disabled="updatingId === page.id || page.published"
+                    @click="handleDelete(page)"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -195,6 +203,20 @@ async function togglePublish(page: Page) {
     if (index !== -1) pages.value[index] = updated
   } catch (err: unknown) {
     error.value = errorMessage(err, 'Failed to update page')
+  } finally {
+    updatingId.value = null
+  }
+}
+
+async function handleDelete(page: Page) {
+  if (!confirm(`Delete the draft page "${page.title_en}"? This cannot be undone.`)) return
+  updatingId.value = page.id
+  error.value = ''
+  try {
+    await $fetch(`/api/pages/${page.id}`, { method: 'DELETE' })
+    pages.value = pages.value.filter((candidate) => candidate.id !== page.id)
+  } catch (err: unknown) {
+    error.value = errorMessage(err, 'Failed to delete page')
   } finally {
     updatingId.value = null
   }

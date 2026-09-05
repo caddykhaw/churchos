@@ -1,3 +1,5 @@
+import { useSupabaseAdmin } from '../../utils/supabase'
+
 /**
  * Daily cron job for workspace lifecycle maintenance.
  * Run daily at 2 AM UTC (configure in your scheduler — Cloudflare Workers Cron, cron-job.org, etc.)
@@ -24,6 +26,11 @@ export default defineEventHandler(async () => {
 
   if (error) {
     console.error('[Cron] Demo sweep query error:', error.message)
+    // Surface the failure to the scheduler instead of reporting a false success.
+    throw createError({
+      statusCode: 500,
+      message: 'Cron sweep failed'
+    })
   }
 
   for (const org of staleDemoOrgs || []) {
