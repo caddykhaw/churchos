@@ -3,6 +3,16 @@
 This directory contains bite-sized implementation plans for the ChurchOS multi-tenant platform.
 
 **Design Spec:** `../specs/2026-08-24-churchos-multi-tenant-design.md`
+**Latest audit:** `../audits/2026-09-05-saas-readiness-audit.md` — CRUD coverage, SaaS-readiness gaps, requirements, and success metrics.
+
+---
+
+## Current Status (2026-09-05)
+
+- **Plan 1 (Foundation):** ✅ Complete.
+- **Plans 2–4 (Modules):** 🚧 Executing via the combined plan `2026-08-28-modules-people-journey-pages.md`. All three modules are **live in demo-first MVP form** (gated list + create endpoints, UI pages, real data), but **Update / Read-by-id / Delete are not implemented anywhere yet** — see the audit for the per-module CRUD gap table.
+- **Plan 5 (Billing):** ⏸️ Superseded by the demo-first model (owner-led activation; no Stripe).
+- **Plan 6 (Marketing):** 🚧 Landing/pricing/terms shipped in `apps/marketing`; contact form + SEO pass outstanding.
 
 ---
 
@@ -29,8 +39,9 @@ Plans should be executed in sequence as each builds on the previous:
 
 ---
 
-### 🔜 Plan 2: PEOPLE Module
-**File:** `2026-08-25-people-module.md` (to be written)  
+### 🚧 Plan 2: PEOPLE Module
+**File:** executed via `2026-08-28-modules-people-journey-pages.md` (Phase 2)  
+**Status:** Partial — members table + list/create API + UI page live; update/read-by-id/archive, donations, events, groups, volunteers outstanding.  
 **Duration:** 3-4 weeks  
 **Delivers:**
 - Member management (CRUD, profiles, emergency contacts)
@@ -55,8 +66,9 @@ Plans should be executed in sequence as each builds on the previous:
 
 ---
 
-### 🔜 Plan 3: JOURNEY Module
-**File:** `2026-08-25-journey-module.md` (to be written)  
+### 🚧 Plan 3: JOURNEY Module
+**File:** executed via `2026-08-28-modules-people-journey-pages.md` (Phase 3)  
+**Status:** Partial — tracks/enrollments tables + list APIs (tracks create included) + UI page live; track edit/delete, enroll endpoint, lessons/quizzes/certificates outstanding.  
 **Duration:** 4-5 weeks  
 **Delivers:**
 - Tracks, modules, lessons (bilingual EN/ZH)
@@ -84,8 +96,9 @@ Plans should be executed in sequence as each builds on the previous:
 
 ---
 
-### 🔜 Plan 4: PAGES Module
-**File:** `2026-08-25-pages-module.md` (to be written)  
+### 🚧 Plan 4: PAGES Module
+**File:** executed via `2026-08-28-modules-people-journey-pages.md` (Phase 4)  
+**Status:** Partial — pages table + list/create API + publish toggle + UI page live; content editing, page builder, public website rendering, custom domains outstanding.  
 **Duration:** 4-5 weeks  
 **Delivers:**
 - Page builder UI (block-based editing)
@@ -219,4 +232,4 @@ For AI-driven parallel development:
 
 ---
 
-**Status:** Plan 1 written and ready. Plans 2-6 to be written as needed.
+**Status:** Plan 1 complete. Plans 2–4 partially executed (demo-first MVP live; CRUD gaps tracked in the 2026-09-05 audit). Plan 5 superseded. Plan 6 partially shipped.

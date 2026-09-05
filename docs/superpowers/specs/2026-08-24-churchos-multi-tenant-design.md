@@ -8,6 +8,8 @@
 | Owner | ChurchOS (independent) |
 | Stack | Nuxt 4 + Nitro + Supabase + Cloudflare + Docker |
 
+> **2026-09-05 update:** Payments (Stripe) are deferred — billing is owner-led activation under the demo-first model (see **Activation & workspace lifecycle** below). Current build state, CRUD coverage, requirements, and success metrics: `docs/superpowers/audits/2026-09-05-saas-readiness-audit.md`.
+
 ## Purpose
 
 ChurchOS is a multi-tenant SaaS platform for Malaysian churches, offering modular church management tools with isolated data per organization, modular subscription pricing, and bilingual/multilingual support. It evolves the proven DOVES discipleship LMS architecture into a full Church Management System (ChMS) with community features, event management, donations, and people-centric website building.
@@ -54,7 +56,7 @@ Churches subscribe to modules individually or bundled. JOURNEY includes basic me
 | Realtime | Supabase Realtime |
 | File storage | Supabase Storage |
 | Hosting | Cloudflare Pages (SSR for platform, static for marketing) |
-| Payments | Stripe |
+| Payments | Stripe (deferred — owner-led activation; see 2026-09-05 note above) |
 | Email | Resend |
 | Domain provisioning | Cloudflare API + Registrar API |
 
