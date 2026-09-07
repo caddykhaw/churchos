@@ -4,6 +4,7 @@ export interface OrganizationSummary {
   name: string
   subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
   is_demo?: boolean
+  trial_ends_at?: string | null
   subscribed_modules?: string[]
   subscription_tier?: 'starter' | 'growth' | 'pro'
   roles?: string[]

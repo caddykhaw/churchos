@@ -32,6 +32,7 @@
 
     <main class="main">
       <DemoBanner v-if="isDemoOrg" />
+      <TrialBanner v-else-if="currentOrg?.trial_ends_at" />
       <slot />
     </main>
   </div>

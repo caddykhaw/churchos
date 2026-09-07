@@ -8,6 +8,7 @@ export default defineEventHandler((event) => {
     slug: string
     name: string
     subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
+    trial_ends_at: string | null
     is_demo: boolean
     roles: string[]
   }
@@ -19,6 +20,7 @@ export default defineEventHandler((event) => {
       slug: string
       name: string
       subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
+      trial_ends_at: string | null
       is_demo: boolean
     }
   }) => ({
@@ -26,6 +28,7 @@ export default defineEventHandler((event) => {
     slug: membership.organizations.slug,
     name: membership.organizations.name,
     subscription_status: membership.organizations.subscription_status,
+    trial_ends_at: membership.organizations.trial_ends_at,
     is_demo: membership.organizations.is_demo,
     roles: membership.roles
   }))

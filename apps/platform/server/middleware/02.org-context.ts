@@ -95,6 +95,7 @@ export default defineEventHandler(async (event) => {
         slug: membership.organizations.slug,
         name: membership.organizations.name,
         subscription_status: membership.organizations.subscription_status,
+        trial_ends_at: membership.organizations.trial_ends_at,
         subscribed_modules: membership.organizations.subscribed_modules,
         subscription_tier: membership.organizations.subscription_tier,
         is_demo: membership.organizations.is_demo,
@@ -116,6 +117,7 @@ export type OrgContextEvent = H3Event & {
       slug: string
       name: string
       subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
+      trial_ends_at: string | null
       subscribed_modules: string[]
       subscription_tier: 'starter' | 'growth' | 'pro'
       is_demo: boolean

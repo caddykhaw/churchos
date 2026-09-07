@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
           slug,
           name,
           subscription_status,
+          trial_ends_at,
           subscribed_modules,
           subscription_tier,
           is_demo
