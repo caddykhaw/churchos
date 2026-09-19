@@ -21,30 +21,26 @@ jobs:
           DOMAIN=demo.churchos.my
           API=https://api.cloudflare.com/client/v4
 
-          # Remove the custom domain from any Pages project that has it.
-          for PROJECT in $(curl -sf -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=50" | jq -r '.result[].name'); do
+          # Remove the custom domain from the known Pages projects.
+          for PROJECT in churchos-platform churchos-marketing; do
             STATUS=$(curl -s -o /tmp/dom.json -w '%{http_code}' -X DELETE \
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
               "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/domains/$DOMAIN")
-            if [ "$STATUS" = "200" ]; then
-              echo "Detached $DOMAIN from Pages project '$PROJECT'"
-            else
-              echo "Pages '$PROJECT': no-op (HTTP $STATUS)"
-            fi
+            echo "Pages '$PROJECT' delete -> HTTP $STATUS: $(cat /tmp/dom.json | head -c 200)"
           done
 
           # Delete the DNS record(s) for the domain in the zone.
-          IDS=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$DOMAIN&per_page=50" | jq -r '.result[].id')
-          if [ -z "$IDS" ]; then
-            echo "No DNS records found for $DOMAIN (already clean)"
-          fi
+          LIST=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$DOMAIN&per_page=50")
+          CODE=$(echo "$LIST" | tail -1)
+          BODY=$(echo "$LIST" | sed '$d')
+          echo "DNS list -> HTTP $CODE: $(echo "$BODY" | head -c 300)"
+          IDS=$(echo "$BODY" | jq -r '.result[].id // empty')
           for ID in $IDS; do
-            curl -sf -X DELETE \
+            DEL=$(curl -s -w '%{http_code}' -X DELETE -o /tmp/del.json \
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records/$ID" > /dev/null
-            echo "Deleted DNS record $ID for $DOMAIN"
+              "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records/$ID")
+            echo "Deleted DNS record $ID -> HTTP $DEL: $(head -c 200 /tmp/del.json)"
           done
 
           echo "Cleanup complete."
