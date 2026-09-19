@@ -82,19 +82,20 @@ jobs:
             }
             console.log(JSON.stringify({ env_vars: env }))
           ')
-          # Purpose-built endpoint: updates ONLY the env bindings for each
-          # environment (PATCH on the project would replace deployment_configs).
-          for ENVIRONMENT in production preview; do
-            HTTP=$(curl -sS -o /tmp/cf-env-$ENVIRONMENT.json -w "%{http_code}" \
-              -X PATCH \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/churchos-platform/environment/${ENVIRONMENT}" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d "${PAYLOAD}")
-            echo "${ENVIRONMENT}: Cloudflare API responded ${HTTP}"
-            head -c 300 /tmp/cf-env-$ENVIRONMENT.json; echo
-            [ "$HTTP" = "200" ] || { echo "Failed to sync ${ENVIRONMENT} env vars"; exit 1; }
-          done
+          # Verified against the Cloudflare OpenAPI schema: env bindings live at
+          # deployment_configs.{production,preview}.env_vars on the project PATCH.
+          HTTP=$(curl -sS -o /tmp/cf-env.json -w "%{http_code}" \
+            -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/churchos-platform" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(node -e '
+              const envVars = JSON.parse(require("fs").readFileSync(0, "utf8")).env_vars
+              console.log(JSON.stringify({ deployment_configs: { production: { env_vars: envVars }, preview: { env_vars: envVars } } }))
+            ' < <(echo "${PAYLOAD}"))")
+          echo "Cloudflare API responded ${HTTP}"
+          head -c 300 /tmp/cf-env.json; echo
+          [ "$HTTP" = "200" ] || { echo "Failed to sync Pages env vars"; exit 1; }
 
       # Confirm the bindings actually landed before deploying (values masked).
       - name: Verify Pages project env bindings
@@ -110,8 +111,6 @@ jobs:
             const prod = project.deployment_configs?.production ?? {}
             const keys = Object.keys(prod.env_vars ?? {})
             console.log("production env_vars:", keys.join(", ") || "(none)")
-            console.log("production compatibility_date:", prod.compatibility_date ?? "(project default)")
-            console.log("production compatibility_flags:", JSON.stringify(prod.compatibility_flags ?? []))
             const required = ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN", "NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "NUXT_CLERK_SECRET_KEY", "JWT_SECRET"]
             const missing = required.filter((key) => !keys.includes(key))
             if (missing.length) {
