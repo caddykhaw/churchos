@@ -76,7 +76,7 @@ jobs:
             })) {
               env[key] = { type: "plain_text", value }
             }
-            console.log(JSON.stringify(env))
+            console.log(JSON.stringify({ env_vars: env }))
           ')
           # Purpose-built endpoint: updates ONLY the env bindings for each
           # environment (PATCH on the project would replace deployment_configs).
