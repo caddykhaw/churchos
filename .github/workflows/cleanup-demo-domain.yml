@@ -17,56 +17,43 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           DOMAIN=demo.churchos.my
           API=https://api.cloudflare.com/client/v4
           AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
 
-          # --- 1. Where is the domain attached? List all Pages projects + domains.
-          echo "=== Pages projects and their custom domains ==="
-          PAGES_JSON=$(curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=50")
-          echo "$PAGES_JSON" | jq -r '.result[] | "\(.name): \(.domains // [] | join(", "))"'
-          PAGES_IDS=$(echo "$PAGES_JSON" | jq -r '.result[].name')
-
-          # Detach from every Pages project that lists the domain.
-          for PROJECT in $PAGES_IDS; do
+          # --- 1. Detach from the two known Pages projects (raw output, non-fatal).
+          for PROJECT in churchos-platform churchos-marketing; do
             STATUS=$(curl -s -o /tmp/dom.json -w '%{http_code}' -X DELETE \
               -H "$AUTH" \
-              "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/domains/$DOMAIN")
-            echo "Pages '$PROJECT' delete -> HTTP $STATUS: $(head -c 200 /tmp/dom.json)"
+              "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/domains/$DOMAIN" || echo "curl-err")
+            echo "Pages '$PROJECT' delete -> HTTP $STATUS: $(head -c 250 /tmp/dom.json 2>/dev/null)"
           done
 
-          # --- 2. Workers custom domains (deleting these removes their DNS record too).
-          echo "=== Workers custom domains matching $DOMAIN ==="
-          WD_JSON=$(curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains?hostname=$DOMAIN&per_page=50")
-          echo "$WD_JSON" | head -c 400; echo
-          WD_IDS=$(echo "$WD_JSON" | jq -r '.result[].id // empty')
-          for ID in $WD_IDS; do
+          # --- 2. List ALL Pages projects raw (to see auth status and every domain).
+          echo "=== Raw Pages projects list ==="
+          curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=50" | head -c 1500; echo
+
+          # --- 3. Workers custom domains for the hostname (deleting removes its DNS too).
+          echo "=== Workers domains raw ==="
+          WD=$(curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains?hostname=$DOMAIN&per_page=50")
+          echo "$WD" | head -c 800; echo
+          for ID in $(echo "$WD" | jq -r '.result[]?.id // empty' 2>/dev/null); do
             DEL=$(curl -s -w '%{http_code}' -o /tmp/wdel.json -X DELETE \
               -H "$AUTH" \
               "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains/$ID")
-            echo "Workers domain $ID delete -> HTTP $DEL: $(head -c 200 /tmp/wdel.json)"
+            echo "Workers domain $ID delete -> HTTP $DEL: $(head -c 250 /tmp/wdel.json)"
           done
 
-          # --- 3. DNS records (token may lack Zone.DNS — report honestly).
-          echo "=== DNS records for $DOMAIN ==="
-          LIST=$(curl -s -w '\n%{http_code}' -H "$AUTH" \
-            "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$DOMAIN&per_page=50")
-          CODE=$(echo "$LIST" | tail -1)
-          BODY=$(echo "$LIST" | sed '$d')
-          echo "DNS list -> HTTP $CODE: $(echo "$BODY" | head -c 300)"
-          if [ "$CODE" = "200" ]; then
-            IDS=$(echo "$BODY" | jq -r '.result[].id // empty')
-            for ID in $IDS; do
-              DEL=$(curl -s -w '%{http_code}' -o /tmp/del.json -X DELETE \
-                -H "$AUTH" \
-                "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records/$ID")
-              echo "Deleted DNS record $ID -> HTTP $DEL: $(head -c 200 /tmp/del.json)"
-            done
-          else
-            echo "!! Token cannot access DNS (HTTP $CODE). Delete the record manually in"
-            echo "!! Cloudflare dashboard -> churchos.my -> DNS, or re-run with a token"
-            echo "!! that includes Zone:DNS:Edit."
-          fi
+          # --- 4. DNS records (token may lack Zone.DNS — report honestly).
+          echo "=== DNS records raw ==="
+          LIST=$(curl -s -H "$AUTH" "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$DOMAIN&per_page=50")
+          echo "$LIST" | head -c 800; echo
+          for ID in $(echo "$LIST" | jq -r '.result[]?.id // empty' 2>/dev/null); do
+            DEL=$(curl -s -w '%{http_code}' -o /tmp/del.json -X DELETE \
+              -H "$AUTH" \
+              "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records/$ID")
+            echo "Deleted DNS record $ID -> HTTP $DEL: $(head -c 250 /tmp/del.json)"
+          done
 
           echo "Cleanup pass complete."
