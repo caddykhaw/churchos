@@ -1,5 +1,5 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne } from '../../utils/db'
 
 /** Returns a single member of the current organization. */
 export default defineEventHandler(async (event) => {
@@ -10,19 +10,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Member id required' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('members')
-    .select('*')
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .single()
+  const member = await dbOne(
+    'SELECT * FROM members WHERE id = ? AND organization_id = ?',
+    [id, org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 404,
-      message: 'Member not found'
-    })
+  if (!member) {
+    throw createError({ statusCode: 404, message: 'Member not found' })
   }
 
-  return data
+  return member
 })

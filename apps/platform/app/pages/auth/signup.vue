@@ -62,6 +62,7 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const config = useRuntimeConfig()
 
 function errorMessage(err: unknown, fallback: string) {
   if (err && typeof err === 'object' && 'data' in err) {
@@ -74,7 +75,6 @@ function errorMessage(err: unknown, fallback: string) {
 }
 
 async function routeAfterAuth() {
-  const config = useRuntimeConfig()
   const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
   if (!me?.authenticated) {
     await navigateTo('/auth/login')

@@ -1,20 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createDbMock } from '../helpers/db-mock'
 
 const mocks = vi.hoisted(() => ({
   provisionDemoSandbox: vi.fn(),
-  signInDemoUser: vi.fn(),
-  useSupabaseAdmin: vi.fn()
+  ensureDemoProfile: vi.fn()
 }))
 
 vi.mock('../../server/utils/demo', () => ({
   provisionDemoSandbox: mocks.provisionDemoSandbox,
-  signInDemoUser: mocks.signInDemoUser
+  ensureDemoProfile: mocks.ensureDemoProfile
 }))
-vi.mock('../../server/utils/supabase', () => ({ useSupabaseAdmin: mocks.useSupabaseAdmin }))
+
+vi.mock('../../server/utils/session', () => ({
+  signSessionToken: vi.fn(() => 'signed-token')
+}))
+
+let db: ReturnType<typeof createDbMock>
+
+vi.mock('../../server/utils/db', () => ({
+  dbAll: (...args: unknown[]) => db.dbAll(...args as [string]),
+  dbOne: (...args: unknown[]) => db.dbOne(...args as [string]),
+  dbRun: (...args: unknown[]) => db.dbRun(...args as [string])
+}))
 
 vi.stubGlobal('defineEventHandler', <T>(callback: T) => callback)
 vi.stubGlobal('getCookie', (event: { cookies?: Record<string, string> }, name: string) => event?.cookies?.[name])
-vi.stubGlobal('setCookie', () => {})
+vi.stubGlobal('setCookie', vi.fn())
+vi.stubGlobal('clientKey', () => 'test-key')
+vi.stubGlobal('rateLimit', () => ({ allowed: true, remaining: 1, retryAfterSeconds: 0 }))
 
 const resetHandler = (await import('../../server/api/demo/reset.post')).default
 const cronHandler = (await import('../../server/api/cron/check-subscriptions.get')).default
@@ -25,8 +38,9 @@ function expectHttpError(error: unknown, statusCode: number, message: string) {
 
 describe('POST /api/demo/reset', () => {
   beforeEach(() => {
-    mocks.provisionDemoSandbox.mockResolvedValue({ id: 'org-new', name: 'Fresh Demo' })
-    mocks.signInDemoUser.mockResolvedValue('token-abc')
+    db = createDbMock()
+    mocks.provisionDemoSandbox.mockResolvedValue({ id: 'org-new', name: 'Fresh Demo', slug: 'demo-x' })
+    mocks.ensureDemoProfile.mockResolvedValue('demo-profile-1')
   })
 
   afterEach(() => {
@@ -34,12 +48,6 @@ describe('POST /api/demo/reset', () => {
   })
 
   it('deletes only the current demo org and provisions a fresh sandbox', async () => {
-    const deleteEqFinal = vi.fn(async () => ({ data: null, error: null }))
-    const deleteEqScope = vi.fn(() => ({ eq: deleteEqFinal }))
-    const deleteEq = vi.fn(() => ({ eq: deleteEqScope }))
-    const from = vi.fn(() => ({ delete: () => ({ eq: deleteEq }) }))
-    mocks.useSupabaseAdmin.mockReturnValue({ from })
-
     vi.stubGlobal('getCookie', () => 'org-old')
 
     await expect(resetHandler({} as never)).resolves.toEqual({
@@ -47,25 +55,21 @@ describe('POST /api/demo/reset', () => {
       organization: { id: 'org-new', name: 'Fresh Demo' }
     })
     expect(mocks.provisionDemoSandbox).toHaveBeenCalledTimes(1)
-    expect(mocks.signInDemoUser).toHaveBeenCalledTimes(1)
-    expect(deleteEq).toHaveBeenCalledWith('id', 'org-old')
-    expect(deleteEqScope).toHaveBeenCalledWith('is_demo', true)
+    expect(db.dbRun).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM organizations'), ['org-old'])
   })
 
   it('provisions a sandbox even with no prior cookie', async () => {
-    const from = vi.fn()
-    mocks.useSupabaseAdmin.mockReturnValue({ from })
-
     vi.stubGlobal('getCookie', () => undefined)
 
     await expect(resetHandler({} as never)).resolves.toMatchObject({ ok: true })
     expect(mocks.provisionDemoSandbox).toHaveBeenCalledTimes(1)
-    expect(from).not.toHaveBeenCalled()
+    expect(db.dbRun).not.toHaveBeenCalled()
   })
 })
 
 describe('GET /api/cron/check-subscriptions', () => {
   beforeEach(() => {
+    db = createDbMock()
     vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => {
       const error = new Error(message) as Error & { statusCode: number }
       error.statusCode = statusCode
@@ -79,43 +83,26 @@ describe('GET /api/cron/check-subscriptions', () => {
   })
 
   it('sweeps demo orgs older than 24h and reports the count', async () => {
-    const stale = [{ id: 'org-stale-1' }, { id: 'org-stale-2' }]
-    const deleteEq = vi.fn(async () => ({ data: null, error: null }))
-    const lt = vi.fn(async () => ({ data: stale, error: null }))
-    const from = vi.fn(() => ({
-      select: () => ({ eq: () => ({ lt }) }),
-      delete: () => ({ eq: deleteEq })
-    }))
-    mocks.useSupabaseAdmin.mockReturnValue({ from })
+    db.dbAll.mockResolvedValue([{ id: 'org-stale-1' }, { id: 'org-stale-2' }])
 
     const result = await cronHandler({} as never) as { ok: boolean, results: { demoOrgSwept: number } }
     expect(result.ok).toBe(true)
     expect(result.results.demoOrgSwept).toBe(2)
-    expect(deleteEq).toHaveBeenCalledWith('id', 'org-stale-1')
-    expect(deleteEq).toHaveBeenCalledWith('id', 'org-stale-2')
+    expect(db.dbRun).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM organizations'), ['org-stale-1'])
+    expect(db.dbRun).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM organizations'), ['org-stale-2'])
   })
 
   it('sweeps nothing when all demo orgs are fresh', async () => {
-    const deleteEq = vi.fn()
-    const lt = vi.fn(async () => ({ data: [], error: null }))
-    const from = vi.fn(() => ({
-      select: () => ({ eq: () => ({ lt }) }),
-      delete: () => ({ eq: deleteEq })
-    }))
-    mocks.useSupabaseAdmin.mockReturnValue({ from })
+    db.dbAll.mockResolvedValue([])
 
     const result = await cronHandler({} as never) as { ok: boolean, results: { demoOrgSwept: number } }
     expect(result.ok).toBe(true)
     expect(result.results.demoOrgSwept).toBe(0)
-    expect(deleteEq).not.toHaveBeenCalled()
+    expect(db.dbRun).not.toHaveBeenCalled()
   })
 
   it('throws 500 when the sweep query fails', async () => {
-    const lt = vi.fn(async () => ({ data: null, error: { message: 'db down' } }))
-    const from = vi.fn(() => ({
-      select: () => ({ eq: () => ({ lt }) })
-    }))
-    mocks.useSupabaseAdmin.mockReturnValue({ from })
+    db.dbAll.mockRejectedValue(new Error('db down'))
 
     await expect(cronHandler({} as never)).rejects.toSatisfy(error => {
       expectHttpError(error, 500, 'Cron sweep failed')

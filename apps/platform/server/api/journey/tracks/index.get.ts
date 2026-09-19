@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbAll } from '../../../utils/db'
 
 /**
  * Lists discipleship tracks for the current organization with their
@@ -8,18 +8,15 @@ import { useSupabaseAdmin } from '../../../utils/supabase'
 export default defineEventHandler(async (event) => {
   const org = requireModule(event, 'journey')
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('tracks')
-    .select('*, enrollments(count)')
-    .eq('organization_id', org.id)
-    .order('created_at', { ascending: false })
+  const rows = await dbAll(
+    `SELECT t.*, (
+       SELECT COUNT(*) FROM enrollments e WHERE e.track_id = t.id
+     ) AS enrollment_count
+       FROM tracks t
+      WHERE t.organization_id = ?
+      ORDER BY t.created_at DESC`,
+    [org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to load tracks'
-    })
-  }
-
-  return data ?? []
+  return rows
 })

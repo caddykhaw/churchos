@@ -1,4 +1,4 @@
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbAll, dbRun } from '../../utils/db'
 
 /**
  * Daily cron job for workspace lifecycle maintenance.
@@ -10,33 +10,30 @@ import { useSupabaseAdmin } from '../../utils/supabase'
  */
 
 export default defineEventHandler(async () => {
-  const supabase = useSupabaseAdmin()
-
   const results = {
     demoOrgSwept: 0
   }
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: staleDemoOrgs, error } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('is_demo', true)
-    .lt('created_at', cutoff)
+  try {
+    const staleDemoOrgs = await dbAll(
+      'SELECT id FROM organizations WHERE is_demo = 1 AND created_at < ?',
+      [cutoff]
+    )
 
-  if (error) {
-    console.error('[Cron] Demo sweep query error:', error.message)
+    for (const org of staleDemoOrgs) {
+      // Cascade removes module data + memberships.
+      await dbRun('DELETE FROM organizations WHERE id = ?', [org.id])
+      results.demoOrgSwept++
+    }
+  } catch (error) {
+    console.error('[Cron] Demo sweep failed:', error)
     // Surface the failure to the scheduler instead of reporting a false success.
     throw createError({
       statusCode: 500,
       message: 'Cron sweep failed'
     })
-  }
-
-  for (const org of staleDemoOrgs || []) {
-    // Cascade removes module data + memberships.
-    await supabase.from('organizations').delete().eq('id', org.id)
-    results.demoOrgSwept++
   }
 
   console.log('[Cron] Workspace maintenance completed:', results)

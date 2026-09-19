@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbOne, dbRun } from '../../../utils/db'
 
 /**
  * Deletes a discipleship track of the current organization. Blocked while
@@ -14,26 +14,18 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Track id required' })
   }
 
-  const supabase = useSupabaseAdmin()
-
-  const { data: track } = await supabase
-    .from('tracks')
-    .select('id')
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .single()
+  const track = await dbOne(
+    'SELECT id FROM tracks WHERE id = ? AND organization_id = ?',
+    [id, org.id]
+  )
 
   if (!track) {
     throw createError({ statusCode: 404, message: 'Track not found' })
   }
 
-  const { data: enrollments } = await supabase
-    .from('enrollments')
-    .select('id')
-    .eq('track_id', id)
-    .limit(1)
+  const enrollment = await dbOne('SELECT id FROM enrollments WHERE track_id = ? LIMIT 1', [id])
 
-  if (enrollments && enrollments.length > 0) {
+  if (enrollment) {
     throw createError({
       statusCode: 409,
       message: 'Track has enrollments and cannot be deleted. Consider archiving it as a draft instead.'
@@ -41,24 +33,13 @@ export default defineEventHandler(async (event) => {
   }
 
   // Detach other tracks that reference this one as their prerequisite.
-  await supabase
-    .from('tracks')
-    .update({ prerequisite_track_id: null })
-    .eq('organization_id', org.id)
-    .eq('prerequisite_track_id', id)
+  await dbRun(
+    `UPDATE tracks SET prerequisite_track_id = NULL
+      WHERE organization_id = ? AND prerequisite_track_id = ?`,
+    [org.id, id]
+  )
 
-  const { error } = await supabase
-    .from('tracks')
-    .delete()
-    .eq('id', id)
-    .eq('organization_id', org.id)
-
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to delete track'
-    })
-  }
+  await dbRun('DELETE FROM tracks WHERE id = ? AND organization_id = ?', [id, org.id])
 
   return { ok: true }
 })

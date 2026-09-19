@@ -1,5 +1,5 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne, dbRun } from '../../utils/db'
 
 const MEMBER_STATUSES = ['active', 'inactive', 'former'] as const
 
@@ -49,20 +49,18 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Nothing to update' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('members')
-    .update(patch)
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .select()
-    .single()
+  const setClause = Object.keys(patch).map((key) => `${key} = ?`).join(', ')
+  const args = [...Object.values(patch), id, org.id]
 
-  if (error) {
-    throw createError({
-      statusCode: 404,
-      message: 'Member not found'
-    })
+  const rowsAffected = await dbRun(
+    `UPDATE members SET ${setClause}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = ? AND organization_id = ?`,
+    args
+  )
+
+  if (rowsAffected === 0) {
+    throw createError({ statusCode: 404, message: 'Member not found' })
   }
 
-  return data
+  return await dbOne('SELECT * FROM members WHERE id = ?', [id])
 })

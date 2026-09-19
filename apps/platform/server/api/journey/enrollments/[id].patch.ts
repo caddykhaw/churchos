@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbOne, dbRun } from '../../../utils/db'
 
 const ENROLLMENT_STATUSES = ['active', 'completed', 'dropped'] as const
 
@@ -35,12 +35,10 @@ export default defineEventHandler(async (event) => {
   if (body?.mentor_id !== undefined) {
     const mentorId = typeof body.mentor_id === 'string' ? body.mentor_id.trim() : ''
     if (mentorId) {
-      const { data: mentor } = await useSupabaseAdmin()
-        .from('members')
-        .select('id')
-        .eq('id', mentorId)
-        .eq('organization_id', org.id)
-        .single()
+      const mentor = await dbOne(
+        'SELECT id FROM members WHERE id = ? AND organization_id = ?',
+        [mentorId, org.id]
+      )
 
       if (!mentor) {
         throw createError({ statusCode: 404, message: 'Mentor not found' })
@@ -55,20 +53,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Nothing to update' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('enrollments')
-    .update(patch)
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .select()
-    .single()
+  const setClause = Object.keys(patch).map((key) => `${key} = ?`).join(', ')
+  const rowsAffected = await dbRun(
+    `UPDATE enrollments SET ${setClause} WHERE id = ? AND organization_id = ?`,
+    [...Object.values(patch), id, org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 404,
-      message: 'Enrollment not found'
-    })
+  if (rowsAffected === 0) {
+    throw createError({ statusCode: 404, message: 'Enrollment not found' })
   }
 
-  return data
+  return await dbOne('SELECT * FROM enrollments WHERE id = ?', [id])
 })

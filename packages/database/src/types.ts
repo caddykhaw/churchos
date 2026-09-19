@@ -3,13 +3,13 @@ export interface Organization {
   slug: string
   name: string
   custom_domain: string | null
-  custom_domain_verified: boolean
+  custom_domain_verified: number
   subscription_tier: 'starter' | 'growth' | 'pro'
   billing_cycle: 'monthly' | 'annual'
-  subscribed_modules: string[]
+  subscribed_modules: string
   trial_ends_at: string | null
   subscription_status: 'inactive' | 'active' | 'suspended' | 'cancelled'
-  is_demo: boolean
+  is_demo: number
   suspended_at: string | null
   suspension_months: number
   created_at: string
@@ -31,7 +31,7 @@ export interface OrganizationMember {
   id: string
   organization_id: string
   user_id: string
-  roles: string[]
+  roles: string
   status: 'active' | 'inactive' | 'pending'
   joined_at: string
 }
@@ -91,7 +91,7 @@ export interface Page {
   title_zh: string | null
   title_ms: string | null
   title_ta: string | null
-  published: boolean
+  published: number
   created_at: string
   updated_at: string
 }

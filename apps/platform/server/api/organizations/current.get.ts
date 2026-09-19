@@ -1,8 +1,11 @@
-import type { Organization, OrganizationMember } from '@churchos/database'
+import { parseJsonArray } from '@churchos/database'
 import { requireAuth } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne } from '../../utils/db'
 
-type Membership = OrganizationMember & { organizations: Pick<Organization, 'id' | 'slug' | 'name' | 'subscription_status' | 'subscribed_modules' | 'subscription_tier' | 'is_demo'> }
+interface MembershipLike {
+  organization_id: string
+  status: string
+}
 
 /**
  * Returns the full organizations row for the caller's current org context.
@@ -13,24 +16,23 @@ export default defineEventHandler(async (event) => {
   const user = requireAuth(event)
   const contextOrg = event.context.org
 
-  const memberships = (user.organizations ?? []) as Membership[]
+  const memberships = (user.organizations ?? []) as MembershipLike[]
   const orgId = contextOrg?.id
-    ?? memberships.find((membership) => membership.status === 'active')?.organization_id
+    ?? memberships.find((membership: MembershipLike) => membership.status === 'active')?.organization_id
 
   if (!orgId) {
     throw createError({ statusCode: 400, message: 'No organization found for this account' })
   }
 
-  const admin = useSupabaseAdmin()
-  const { data: org, error } = await admin
-    .from('organizations')
-    .select('*')
-    .eq('id', orgId)
-    .maybeSingle()
+  const org = await dbOne('SELECT * FROM organizations WHERE id = ?', [orgId])
 
-  if (error || !org) {
+  if (!org) {
     throw createError({ statusCode: 404, message: 'Organization not found' })
   }
 
-  return org
+  return {
+    ...org,
+    subscribed_modules: parseJsonArray(org.subscribed_modules),
+    is_demo: Number(org.is_demo) === 1
+  }
 })

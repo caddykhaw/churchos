@@ -1,6 +1,6 @@
 import { requireAuth } from '../../utils/auth'
 import { provisionSubdomain } from '../../utils/cloudflare'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne, dbRun } from '../../utils/db'
 
 const SLUG_PATTERN = /^(?=.{3,30}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/
 const RESERVED_SLUGS = new Set([
@@ -19,14 +19,15 @@ const RESERVED_SLUGS = new Set([
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === 'object'
     && error !== null
-    && 'code' in error
-    && error.code === '23505'
+    && 'message' in error
+    && typeof (error as { message?: unknown }).message === 'string'
+    && (error as { message: string }).message.includes('UNIQUE constraint failed')
 }
 
 export default defineEventHandler(async (event) => {
   const user = requireAuth(event)
 
-  // The shared demo account may not create its own workspaces — it explores
+  // The shared demo profile may not create its own workspaces — it explores
   // isolated sandbox orgs provisioned by the demo flow.
   const config = useRuntimeConfig()
   if (event.context.org?.is_demo || user.email === String(config.public.demoEmail || '')) {
@@ -62,20 +63,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const admin = useSupabaseAdmin()
-  const { data: existing, error: existingError } = await admin
-    .from('organizations')
-    .select('id')
-    .eq('slug', slug)
-    .maybeSingle()
-
-  if (existingError) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to check organization availability'
-    })
-  }
-
+  const existing = await dbOne('SELECT id FROM organizations WHERE slug = ?', [slug])
   if (existing) {
     throw createError({
       statusCode: 409,
@@ -83,49 +71,31 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { data: organization, error: organizationError } = await admin
-    .from('organizations')
-    .insert({
-      name,
-      slug,
-      subscription_tier: 'starter',
-      billing_cycle: 'monthly',
-      subscribed_modules: [],
-      trial_ends_at: null,
-      subscription_status: 'inactive',
-      is_demo: false,
-      suspension_months: 0
-    })
-    .select()
-    .single()
-
-  // The database unique constraint remains the source of truth under concurrent requests.
-  if (isUniqueViolation(organizationError)) {
-    throw createError({
-      statusCode: 409,
-      message: 'This name is already taken'
-    })
+  const orgId = crypto.randomUUID()
+  try {
+    await dbRun(
+      `INSERT INTO organizations (id, slug, name, subscription_tier, billing_cycle, subscribed_modules,
+                                  trial_ends_at, subscription_status, is_demo, suspension_months)
+       VALUES (?, ?, ?, 'starter', 'monthly', '[]', NULL, 'inactive', 0, 0)`,
+      [orgId, slug, name]
+    )
+  } catch (error) {
+    // The database unique constraint remains the source of truth under concurrent requests.
+    if (isUniqueViolation(error)) {
+      throw createError({ statusCode: 409, message: 'This name is already taken' })
+    }
+    throw createError({ statusCode: 500, message: 'Failed to create organization' })
   }
 
-  if (organizationError || !organization) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to create organization'
-    })
-  }
-
-  const { error: memberError } = await admin
-    .from('organization_members')
-    .insert({
-      organization_id: organization.id,
-      user_id: user.id,
-      roles: ['admin'],
-      status: 'active'
-    })
-
-  if (memberError) {
+  try {
+    await dbRun(
+      `INSERT INTO organization_members (id, organization_id, user_id, roles, status)
+       VALUES (?, ?, ?, '["admin"]', 'active')`,
+      [crypto.randomUUID(), orgId, user.id]
+    )
+  } catch {
     // Keep failed creation attempts from leaving an inaccessible organization behind.
-    await admin.from('organizations').delete().eq('id', organization.id)
+    await dbRun('DELETE FROM organizations WHERE id = ?', [orgId])
     throw createError({
       statusCode: 500,
       message: 'Failed to add user as admin'
@@ -137,6 +107,8 @@ export default defineEventHandler(async (event) => {
   } catch {
     // DNS provisioning is retriable and must not invalidate a completed database creation.
   }
+
+  const organization = await dbOne('SELECT * FROM organizations WHERE id = ?', [orgId])
 
   return {
     organization,

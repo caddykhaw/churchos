@@ -1,9 +1,10 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne, dbRun } from '../../utils/db'
 
 /**
  * Archives a member of the current organization (soft delete: member_status
- * transitions to 'former'). Returns 409 when the member is already archived.
+ * transitions to 'former'). Returns 404 when the member is already archived
+ * or missing.
  */
 export default defineEventHandler(async (event) => {
   const org = requireModule(event, 'people', { role: 'admin' })
@@ -13,21 +14,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Member id required' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('members')
-    .update({ member_status: 'former' })
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .neq('member_status', 'former')
-    .select()
-    .single()
+  const rowsAffected = await dbRun(
+    `UPDATE members
+        SET member_status = 'former', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = ? AND organization_id = ? AND member_status != 'former'`,
+    [id, org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 404,
-      message: 'Member not found'
-    })
+  if (rowsAffected === 0) {
+    throw createError({ statusCode: 404, message: 'Member not found' })
   }
 
-  return data
+  return await dbOne('SELECT * FROM members WHERE id = ?', [id])
 })

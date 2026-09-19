@@ -1,18 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createDbMock } from '../helpers/db-mock'
 
 const mocks = vi.hoisted(() => ({
-  requireModule: vi.fn(),
-  useSupabaseAdmin: vi.fn()
+  requireModule: vi.fn()
 }))
 
 vi.mock('../../server/utils/auth', () => ({ requireModule: mocks.requireModule }))
-vi.mock('../../server/utils/supabase', () => ({ useSupabaseAdmin: mocks.useSupabaseAdmin }))
+
+let db: ReturnType<typeof createDbMock>
+
+vi.mock('../../server/utils/db', () => ({
+  dbAll: (...args: unknown[]) => db.dbAll(...args as [string]),
+  dbOne: (...args: unknown[]) => db.dbOne(...args as [string]),
+  dbRun: (...args: unknown[]) => db.dbRun(...args as [string])
+}))
 
 vi.stubGlobal('defineEventHandler', <T>(callback: T) => callback)
 
 const handler = (await import('../../server/api/journey/tracks/index.post')).default
-
-type SupabaseResult<T> = { data: T, error: unknown }
 
 const org = { id: 'org-1', slug: 'grace-church', name: 'Grace Church' }
 
@@ -28,6 +33,7 @@ describe('POST /api/journey/tracks', () => {
       return error
     })
     mocks.requireModule.mockReturnValue(org)
+    db = createDbMock()
   })
 
   afterEach(() => {
@@ -36,47 +42,43 @@ describe('POST /api/journey/tracks', () => {
   })
 
   it('rejects missing titles before querying the database', async () => {
-    const admin = { from: vi.fn() }
-    mocks.useSupabaseAdmin.mockReturnValue(admin)
     vi.stubGlobal('readBody', async () => ({ title_en: '' }))
 
     await expect(handler({} as never)).rejects.toSatisfy(error => {
       expectHttpError(error, 400, 'Track title is required')
       return true
     })
-    expect(admin.from).not.toHaveBeenCalled()
+    expect(db.dbRun).not.toHaveBeenCalled()
   })
 
   it('creates a draft track scoped to the current organization by default', async () => {
     const track = { id: 'track-1', organization_id: 'org-1', title_en: 'Foundations', status: 'draft' }
-    const insert = vi.fn(() => ({
-      select: () => ({
-        single: async (): Promise<SupabaseResult<typeof track>> => ({ data: track, error: null })
-      })
-    }))
-    mocks.useSupabaseAdmin.mockReturnValue({ from: vi.fn(() => ({ insert })) })
+    db.dbOne.mockResolvedValue(track)
     vi.stubGlobal('readBody', async () => ({ title_en: 'Foundations', description: 'Basics' }))
 
     await expect(handler({} as never)).resolves.toEqual(track)
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      organization_id: 'org-1',
-      title_en: 'Foundations',
-      description: 'Basics',
-      status: 'draft'
-    }))
+    const [sql, args] = db.dbRun.mock.calls[0]!
+    expect(String(sql)).toContain('INSERT INTO tracks')
+    expect(args).toContain('org-1')
+    expect(args).toContain('Foundations')
+    expect(args).toContain('Basics')
+    expect(args).toContain('draft')
   })
 
   it('honours an explicit published status', async () => {
     const track = { id: 'track-2', organization_id: 'org-1', title_en: 'Baptism Prep', status: 'published' }
-    const insert = vi.fn(() => ({
-      select: () => ({
-        single: async (): Promise<SupabaseResult<typeof track>> => ({ data: track, error: null })
-      })
-    }))
-    mocks.useSupabaseAdmin.mockReturnValue({ from: vi.fn(() => ({ insert })) })
+    db.dbOne.mockResolvedValue(track)
     vi.stubGlobal('readBody', async () => ({ title_en: 'Baptism Prep', status: 'published' }))
 
     await expect(handler({} as never)).resolves.toEqual(track)
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: 'published' }))
+    expect(db.dbRun.mock.calls[0]![1]).toContain('published')
+  })
+
+  it('requires the admin role', async () => {
+    db.dbOne.mockResolvedValue({ id: 'track-1' })
+    vi.stubGlobal('readBody', async () => ({ title_en: 'Foundations' }))
+
+    await handler({} as never)
+    expect(mocks.requireModule).toHaveBeenCalledWith(expect.anything(), 'journey', { role: 'admin' })
   })
 })

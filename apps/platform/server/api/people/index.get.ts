@@ -1,5 +1,5 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbAll, dbOne } from '../../utils/db'
 
 /**
  * Lists members for the current organization, optionally filtered by name or
@@ -15,29 +15,26 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(Math.max(Number(query.limit) || 100, 1), 500)
   const offset = Math.max(Number(query.offset) || 0, 0)
 
-  let builder = useSupabaseAdmin()
-    .from('members')
-    .select('*', { count: 'exact' })
-    .eq('organization_id', org.id)
-    .order('full_name', { ascending: true })
-    .range(offset, offset + limit - 1)
+  const args: unknown[] = [org.id]
+  let where = 'organization_id = ?'
 
   if (status) {
-    builder = builder.eq('member_status', status)
+    where += ' AND member_status = ?'
+    args.push(status)
   }
 
   if (search) {
-    builder = builder.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+    where += ' AND (full_name LIKE ? OR email LIKE ?)'
+    const pattern = `%${search}%`
+    args.push(pattern, pattern)
   }
 
-  const { data, error, count } = await builder
+  const total = await dbOne(`SELECT COUNT(*) AS count FROM members WHERE ${where}`, args)
 
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to load members'
-    })
-  }
+  const rows = await dbAll(
+    `SELECT * FROM members WHERE ${where} ORDER BY full_name COLLATE NOCASE ASC LIMIT ? OFFSET ?`,
+    [...args, limit, offset]
+  )
 
-  return { data: data ?? [], total: count ?? data?.length ?? 0, limit, offset }
+  return { data: rows, total: Number(total?.count ?? 0), limit, offset }
 })

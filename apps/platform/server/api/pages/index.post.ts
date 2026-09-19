@@ -1,13 +1,10 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne, dbRun } from '../../utils/db'
 
 const SLUG_PATTERN = /^(?=.{1,60}$)[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object'
-    && error !== null
-    && 'code' in error
-    && error.code === '23505'
+  return error instanceof Error && error.message.includes('UNIQUE constraint failed')
 }
 
 /** Creates a website page for the current organization. */
@@ -32,33 +29,31 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('pages')
-    .insert({
-      organization_id: org.id,
-      slug,
-      title_en: titleEn,
-      title_zh: typeof body?.title_zh === 'string' ? body.title_zh.trim() || null : null,
-      title_ms: typeof body?.title_ms === 'string' ? body.title_ms.trim() || null : null,
-      title_ta: typeof body?.title_ta === 'string' ? body.title_ta.trim() || null : null,
-      published: false
-    })
-    .select()
-    .single()
-
-  if (isUniqueViolation(error)) {
-    throw createError({
-      statusCode: 409,
-      message: 'A page with this slug already exists'
-    })
+  const id = crypto.randomUUID()
+  try {
+    await dbRun(
+      `INSERT INTO pages (id, organization_id, slug, title_en, title_zh, title_ms, title_ta, published)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        id,
+        org.id,
+        slug,
+        titleEn,
+        typeof body?.title_zh === 'string' ? body.title_zh.trim() || null : null,
+        typeof body?.title_ms === 'string' ? body.title_ms.trim() || null : null,
+        typeof body?.title_ta === 'string' ? body.title_ta.trim() || null : null
+      ]
+    )
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw createError({
+        statusCode: 409,
+        message: 'A page with this slug already exists'
+      })
+    }
+    throw createError({ statusCode: 500, message: 'Failed to create page' })
   }
 
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to create page'
-    })
-  }
-
-  return data
+  const page = await dbOne('SELECT * FROM pages WHERE id = ?', [id])
+  return page ? { ...page, published: Number(page.published) === 1 } : null
 })

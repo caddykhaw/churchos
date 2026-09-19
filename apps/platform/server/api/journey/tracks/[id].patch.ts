@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbOne, dbRun } from '../../../utils/db'
 
 /**
  * Updates a discipleship track of the current organization: bilingual titles,
@@ -42,12 +42,10 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, message: 'A track cannot be its own prerequisite' })
     }
     if (prereqId) {
-      const { data: prereq } = await useSupabaseAdmin()
-        .from('tracks')
-        .select('id, prerequisite_track_id')
-        .eq('id', prereqId)
-        .eq('organization_id', org.id)
-        .single()
+      const prereq = await dbOne(
+        'SELECT id, prerequisite_track_id FROM tracks WHERE id = ? AND organization_id = ?',
+        [prereqId, org.id]
+      )
 
       if (!prereq) {
         throw createError({ statusCode: 404, message: 'Prerequisite track not found' })
@@ -66,20 +64,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Nothing to update' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('tracks')
-    .update(patch)
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .select()
-    .single()
+  const setClause = Object.keys(patch).map((key) => `${key} = ?`).join(', ')
+  const rowsAffected = await dbRun(
+    `UPDATE tracks SET ${setClause}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = ? AND organization_id = ?`,
+    [...Object.values(patch), id, org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 404,
-      message: 'Track not found'
-    })
+  if (rowsAffected === 0) {
+    throw createError({ statusCode: 404, message: 'Track not found' })
   }
 
-  return data
+  return await dbOne('SELECT * FROM tracks WHERE id = ?', [id])
 })

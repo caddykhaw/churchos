@@ -34,14 +34,6 @@
         </div>
       </form>
 
-      <div class="auth-divider" aria-hidden="true">Or</div>
-
-      <div class="auth-actions">
-        <button class="btn btn-ghost btn-block" :disabled="loading" @click="signInWithGoogle">
-          Sign in with Google
-        </button>
-      </div>
-
       <nav class="auth-links" aria-label="Authentication options">
         <NuxtLink to="/auth/signup">Create account</NuxtLink>
         <NuxtLink to="/auth/demo">Try the demo</NuxtLink>
@@ -51,7 +43,6 @@
 </template>
 
 <script setup lang="ts">
-import { createClient } from '@supabase/supabase-js'
 import type { AuthMeResponse } from '../../composables/useOrg'
 
 definePageMeta({ layout: false })
@@ -72,15 +63,7 @@ function errorMessage(err: unknown, fallback: string) {
   return fallback
 }
 
-async function setSession(accessToken: string) {
-  await $fetch('/api/auth/set-session', {
-    method: 'POST',
-    body: { accessToken }
-  })
-}
-
 async function routeAfterAuth() {
-  const config = useRuntimeConfig()
   const me = await $fetch<AuthMeResponse>('/api/auth/me').catch(() => null)
   if (!me?.authenticated) {
     return
@@ -112,43 +95,4 @@ async function handleLogin() {
     loading.value = false
   }
 }
-
-async function signInWithGoogle() {
-  error.value = ''
-  loading.value = true
-
-  try {
-    const supabase = createClient(config.public.supabaseUrl, config.public.supabaseAnonKey)
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/login` }
-    })
-
-    if (authError) {
-      throw authError
-    }
-  } catch (err: unknown) {
-    error.value = err instanceof Error ? err.message : 'Google sign-in failed'
-    loading.value = false
-  }
-}
-
-onMounted(async () => {
-  const supabase = createClient(config.public.supabaseUrl, config.public.supabaseAnonKey)
-  const { data: { session } } = await supabase.auth.getSession()
-
-  if (!session) {
-    return
-  }
-
-  loading.value = true
-  try {
-    await setSession(session.access_token)
-    await routeAfterAuth()
-  } catch (err: unknown) {
-    error.value = errorMessage(err, 'Unable to complete sign-in')
-  } finally {
-    loading.value = false
-  }
-})
 </script>

@@ -34,8 +34,8 @@ export default defineEventHandler((event) => {
   }))
 
   // The demo account is shared: every visitor provisions their own sandbox
-  // org under the same auth user. Expose only the org this session is pointed
-  // at (via __org_id) so visitors can't see or hop into each other's sandboxes.
+  // org under the same demo profile. Expose only the org this session is
+  // pointed at (via __org_id) so visitors can't see each other's sandboxes.
   const currentOrg = event.context.org
   const visibleOrganizations = currentOrg?.is_demo
     ? memberships.filter((membership: MembershipSummary) => membership.id === currentOrg.id)

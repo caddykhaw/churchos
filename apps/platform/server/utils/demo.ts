@@ -1,20 +1,15 @@
-import type { H3Event } from 'h3'
-import { createClient } from '@supabase/supabase-js'
-import { useSupabaseAdmin } from './supabase'
+import { parseJsonArray } from '@churchos/database'
+import { dbAll, dbOne, dbRun } from './db'
 
 const DEMO_ORG_TTL_MS = 24 * 60 * 60 * 1000 // abandoned sandbox sweep
 
 export interface DemoCredentials {
   email: string
-  password: string
 }
 
-export function getDemoCredentials(): DemoCredentials {
+export function getDemoEmail(): string {
   const config = useRuntimeConfig()
-  return {
-    email: String(config.public.demoEmail || 'demo@churchos.my'),
-    password: String(config.public.demoPassword || 'demo-pass-2026')
-  }
+  return String(config.public.demoEmail || 'demo@churchos.my')
 }
 
 function randomSuffix(): string {
@@ -22,138 +17,65 @@ function randomSuffix(): string {
 }
 
 /**
- * Returns the demo sandbox the current request is already pointed at, if that
- * org exists, is a demo org, and the shared demo user is a member of it.
- * This lets a visitor whose session cookie is still valid continue their
- * sandbox instead of stacking a new org on every visit.
+ * Makes sure the shared demo profile exists in Turso (idempotent).
+ * Auth is owned by Clerk; the demo "user" is a local profile row keyed by the
+ * demo email so sandbox orgs have a stable owner.
  */
-export async function getCurrentSandbox(event: H3Event) {
+export async function ensureDemoProfile(): Promise<string> {
+  const email = getDemoEmail()
+
+  const existing = await dbOne('SELECT id FROM profiles WHERE email = ?', [email])
+  if (existing) return String(existing.id)
+
+  const id = crypto.randomUUID()
+  await dbRun(
+    `INSERT INTO profiles (id, email, display_name) VALUES (?, ?, 'ChurchOS Demo')
+     ON CONFLICT(id) DO NOTHING`,
+    [id, email]
+  )
+  const created = await dbOne('SELECT id FROM profiles WHERE email = ?', [email])
+  return String(created?.id || id)
+}
+
+/**
+ * Returns the demo sandbox the current request is already pointed at, if that
+ * org exists, is a demo org, and the demo profile is a member of it.
+ */
+export async function getCurrentSandbox(event: Parameters<typeof getCookie>[0]) {
   const orgId = getCookie(event, '__org_id')
   if (!orgId) return null
 
-  const admin = useSupabaseAdmin()
-  const { data: org } = await admin
-    .from('organizations')
-    .select('id, name, slug')
-    .eq('id', orgId)
-    .eq('is_demo', true)
-    .maybeSingle()
-
+  const org = await dbOne(
+    'SELECT id, name, slug FROM organizations WHERE id = ? AND is_demo = 1',
+    [orgId]
+  )
   if (!org) return null
 
-  const demoUserId = await ensureDemoAuthUser()
-  const { data: membership } = await admin
-    .from('organization_members')
-    .select('id')
-    .eq('organization_id', org.id)
-    .eq('user_id', demoUserId)
-    .eq('status', 'active')
-    .maybeSingle()
+  const demoProfileId = await ensureDemoProfile()
+  const membership = await dbOne(
+    `SELECT id FROM organization_members
+      WHERE organization_id = ? AND user_id = ? AND status = 'active'`,
+    [orgId, demoProfileId]
+  )
 
   return membership ? org : null
 }
 
-/**
- * Makes sure the shared demo auth user exists in Supabase (idempotent).
- * The credentials are public by design — the demo sandbox is open to anyone
- * who visits the demo login page.
- */
-export async function ensureDemoAuthUser(): Promise<string> {
-  const admin = useSupabaseAdmin()
-  const { email } = getDemoCredentials()
-
-  const { data: existing } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000
-  })
-
-  const found = existing?.users.find((candidate) => candidate.email?.toLowerCase() === email.toLowerCase())
-  if (found?.id) {
-    // Profile may be missing if the user predates the platform schema.
-    const { data: profile } = await admin.from('profiles').select('id').eq('id', found.id).maybeSingle()
-    if (!profile) {
-      await admin.from('profiles').insert({
-        id: found.id,
-        email,
-        display_name: 'ChurchOS Demo',
-        preferred_language: 'en'
-      }).maybeSingle()
-    }
-    return found.id
-  }
-
-  const { email: demoEmail, password } = getDemoCredentials()
-  // Note: named createUserError so it never shadows the createError() helper.
-  const { data: created, error: createUserError } = await admin.auth.admin.createUser({
-    email: demoEmail,
-    password,
-    email_confirm: true,
-    user_metadata: { display_name: 'ChurchOS Demo' }
-  })
-
-  if (createUserError || !created.user) {
-    throw createError({
-      statusCode: 500,
-      message: `Demo account could not be prepared: ${createUserError?.message || 'unknown error'}`
-    })
-  }
-
-  const { error: profileError } = await admin.from('profiles').insert({
-    id: created.user.id,
-    email: demoEmail,
-    display_name: 'ChurchOS Demo',
-    preferred_language: 'en'
-  })
-
-  if (profileError) {
-    throw createError({ statusCode: 500, message: 'Demo account could not be prepared' })
-  }
-
-  return created.user.id
-}
-
-/** Signs the demo auth user in and returns a fresh access token. */
-export async function signInDemoUser(): Promise<string> {
-  const { email, password } = getDemoCredentials()
-  const config = useRuntimeConfig()
-  const supabase = createClient(
-    String(config.public.supabaseUrl),
-    String(config.public.supabaseAnonKey)
-  )
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-  if (error || !data.session) {
-    throw createError({
-      statusCode: 500,
-      message: 'Demo sign-in failed. Contact the ChurchOS team.'
-    })
-  }
-
-  return data.session.access_token
-}
-
-/**
- * Removes abandoned sandbox orgs of the shared demo user (sessions that were
- * never signed out of). Keeps the database from accumulating demo rows.
- */
+/** Removes abandoned demo orgs (sessions that were never signed out of). */
 export async function sweepStaleDemoOrgs() {
-  const admin = useSupabaseAdmin()
-  const demoUserId = await ensureDemoAuthUser()
-
-  const { data: memberships } = await admin
-    .from('organization_members')
-    .select('organization_id, organizations(id, is_demo, created_at)')
-    .eq('user_id', demoUserId)
-    .eq('status', 'active')
-
+  const demoProfileId = await ensureDemoProfile()
   const staleCutoff = new Date(Date.now() - DEMO_ORG_TTL_MS).toISOString()
 
-  for (const membership of memberships || []) {
-    const org = membership.organizations as unknown as { id: string, is_demo: boolean, created_at: string } | null
-    if (org?.is_demo && org.created_at < staleCutoff) {
-      // Cascade deletes module data + the membership.
-      await admin.from('organizations').delete().eq('id', org.id)
-    }
+  const stale = await dbAll(
+    `SELECT o.id FROM organizations o
+       JOIN organization_members om ON om.organization_id = o.id
+      WHERE om.user_id = ? AND om.status = 'active' AND o.is_demo = 1 AND o.created_at < ?`,
+    [demoProfileId, staleCutoff]
+  )
+
+  for (const org of stale) {
+    // Cascade deletes module data + the membership.
+    await dbRun('DELETE FROM organizations WHERE id = ?', [org.id])
   }
 }
 
@@ -161,80 +83,75 @@ export async function sweepStaleDemoOrgs() {
 export async function provisionDemoSandbox() {
   await sweepStaleDemoOrgs()
 
-  const admin = useSupabaseAdmin()
-  const demoUserId = await ensureDemoAuthUser()
+  const demoProfileId = await ensureDemoProfile()
 
   const org = {
     name: 'Grace Community Church (Demo)',
     slug: `demo-${randomSuffix()}`,
     subscription_tier: 'growth',
     billing_cycle: 'annual',
-    subscribed_modules: ['people', 'journey', 'pages'],
+    subscribed_modules: JSON.stringify(['people', 'journey', 'pages']),
     trial_ends_at: null,
     subscription_status: 'active',
-    is_demo: true,
+    is_demo: 1,
     suspension_months: 0
   } as const
 
-  const { data: createdOrg, error: orgError } = await admin
-    .from('organizations')
-    .insert(org)
-    .select()
-    .single()
+  const orgId = crypto.randomUUID()
+  await dbRun(
+    `INSERT INTO organizations (id, slug, name, subscription_tier, billing_cycle, subscribed_modules,
+                                trial_ends_at, subscription_status, is_demo, suspension_months)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [orgId, org.slug, org.name, org.subscription_tier, org.billing_cycle, org.subscribed_modules,
+      org.trial_ends_at, org.subscription_status, org.is_demo, org.suspension_months]
+  )
 
-  if (orgError || !createdOrg) {
-    throw createError({ statusCode: 500, message: 'Could not provision the demo workspace' })
-  }
-
-  const { error: memberError } = await admin
-    .from('organization_members')
-    .insert({
-      organization_id: createdOrg.id,
-      user_id: demoUserId,
-      // All roles are granted so the in-app role switcher can preview each
-      // view without logging the visitor out (which would reset the sandbox).
-      roles: ['admin', 'member', 'mentor', 'volunteer'],
-      status: 'active'
-    })
-
-  if (memberError) {
-    await admin.from('organizations').delete().eq('id', createdOrg.id)
+  try {
+    await dbRun(
+      `INSERT INTO organization_members (id, organization_id, user_id, roles, status)
+       VALUES (?, ?, ?, ?, 'active')`,
+      [crypto.randomUUID(), orgId, demoProfileId, JSON.stringify(['admin', 'member', 'mentor', 'volunteer'])]
+    )
+  } catch {
+    await dbRun('DELETE FROM organizations WHERE id = ?', [orgId])
     throw createError({ statusCode: 500, message: 'Could not prepare the demo workspace' })
   }
 
-  await seedDemoOrg(admin, createdOrg.id)
+  await seedDemoOrg(orgId)
 
-  return createdOrg as { id: string, slug: string, name: string }
+  return { id: orgId, slug: org.slug, name: org.name }
 }
 
-type AdminClient = ReturnType<typeof useSupabaseAdmin>
-
 /** Seeds realistic mock data into a demo org so every screen has content. */
-async function seedDemoOrg(admin: AdminClient, organizationId: string) {
+async function seedDemoOrg(organizationId: string) {
   const memberNames = [
     'John Tan', 'Sarah Lim', 'David Wong', 'Esther Ng',
     'Aaron Chong', 'Grace Lee', 'Samuel Raj', 'Hannah Ooi'
   ]
 
-  const { data: insertedMembers, error: memberError } = await admin
-    .from('members')
-    .insert(memberNames.map((name, index) => ({
-      organization_id: organizationId,
-      full_name: name,
-      email: `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
-      phone: `+60 1${index + 2}-345 6789`,
-      gender: index % 2 === 0 ? 'male' : 'female',
-      member_status: index < 6 ? 'active' : 'inactive',
-      member_number: `M-${String(1001 + index)}`,
-      membership_date: `2022-0${(index % 9) + 1}-15`
-    })))
-    .select('id, full_name')
-
-  if (memberError || !insertedMembers) {
-    throw createError({ statusCode: 500, message: 'Could not seed demo data' })
+  for (const [index, name] of memberNames.entries()) {
+    await dbRun(
+      `INSERT INTO members (id, organization_id, full_name, email, phone, gender, member_status, member_number, membership_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        crypto.randomUUID(),
+        organizationId,
+        name,
+        `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        `+60 1${index + 2}-345 6789`,
+        index % 2 === 0 ? 'male' : 'female',
+        index < 6 ? 'active' : 'inactive',
+        `M-${String(1001 + index)}`,
+        `2022-0${(index % 9) + 1}-15`
+      ]
+    )
   }
 
-  const memberId = (name: string) => insertedMembers.find((member) => member.full_name === name)?.id
+  const memberRows = await dbAll(
+    'SELECT id, full_name FROM members WHERE organization_id = ?',
+    [organizationId]
+  )
+  const memberId = (name: string) => memberRows.find((m) => m.full_name === name)?.id
 
   const tracks = [
     {
@@ -257,12 +174,16 @@ async function seedDemoOrg(admin: AdminClient, organizationId: string) {
     }
   ]
 
-  const { data: insertedTracks } = await admin
-    .from('tracks')
-    .insert(tracks.map((track) => ({ organization_id: organizationId, ...track })))
-    .select('id, title_en')
-
-  const trackId = (titleEn: string) => insertedTracks?.find((track) => track.title_en === titleEn)?.id
+  const trackIds = new Map<string, string>()
+  for (const track of tracks) {
+    const trackId = crypto.randomUUID()
+    trackIds.set(track.title_en, trackId)
+    await dbRun(
+      `INSERT INTO tracks (id, organization_id, title_en, title_zh, description, status)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [trackId, organizationId, track.title_en, track.title_zh, track.description, track.status]
+    )
+  }
 
   const enrollments = [
     { mentee: 'Grace Lee', mentor: 'Sarah Lim', track: 'Foundations of Faith', status: 'active' },
@@ -270,46 +191,39 @@ async function seedDemoOrg(admin: AdminClient, organizationId: string) {
     { mentee: 'Hannah Ooi', mentor: 'Esther Ng', track: 'Foundations of Faith', status: 'completed' }
   ]
 
-  const rows = enrollments.flatMap((enrollment) => {
+  for (const enrollment of enrollments) {
     const menteeId = memberId(enrollment.mentee)
     const mentorId = memberId(enrollment.mentor)
-    const track = trackId(enrollment.track)
-    if (!menteeId || !mentorId || !track) return []
-    return [{
-      organization_id: organizationId,
-      track_id: track,
-      mentee_id: menteeId,
-      mentor_id: mentorId,
-      status: enrollment.status,
-      completed_at: enrollment.status === 'completed' ? new Date().toISOString() : null
-    }]
-  })
-
-  if (rows.length) {
-    await admin.from('enrollments').insert(rows)
+    const trackId = trackIds.get(enrollment.track)
+    if (!menteeId || !mentorId || !trackId) continue
+    await dbRun(
+      `INSERT INTO enrollments (id, organization_id, track_id, mentee_id, mentor_id, status, completed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        crypto.randomUUID(),
+        organizationId,
+        trackId,
+        menteeId,
+        mentorId,
+        enrollment.status,
+        enrollment.status === 'completed' ? new Date().toISOString() : null
+      ]
+    )
   }
 
-  await admin.from('pages').insert([
-    {
-      organization_id: organizationId,
-      slug: 'welcome',
-      title_en: 'Welcome to Grace',
-      title_zh: '欢迎来到恩典堂',
-      published: true
-    },
-    {
-      organization_id: organizationId,
-      slug: 'service-times',
-      title_en: 'Service Times',
-      title_zh: '聚会时间',
-      published: true
-    },
-    {
-      organization_id: organizationId,
-      slug: 'about-us',
-      title_en: 'About Us',
-      title_zh: '关于我们',
-      published: false
-    }
-  ])
+  const pages = [
+    { slug: 'welcome', title_en: 'Welcome to Grace', title_zh: '欢迎来到恩典堂', published: 1 },
+    { slug: 'service-times', title_en: 'Service Times', title_zh: '聚会时间', published: 1 },
+    { slug: 'about-us', title_en: 'About Us', title_zh: '关于我们', published: 0 }
+  ]
+
+  for (const page of pages) {
+    await dbRun(
+      `INSERT INTO pages (id, organization_id, slug, title_en, title_zh, published)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), organizationId, page.slug, page.title_en, page.title_zh, page.published]
+    )
+  }
 }
+
+export { parseJsonArray }

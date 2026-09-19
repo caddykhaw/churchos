@@ -1,75 +1,62 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createDbMock } from '../helpers/db-mock'
 
 const mocks = vi.hoisted(() => ({
-  useSupabaseAdmin: vi.fn(),
-  createClient: vi.fn()
+  clerkCreateUser: vi.fn(),
+  verifyPassword: vi.fn(),
+  signSessionToken: vi.fn()
 }))
 
-vi.mock('../../server/utils/supabase', () => ({ useSupabaseAdmin: mocks.useSupabaseAdmin }))
-vi.mock('@supabase/supabase-js', () => ({ createClient: mocks.createClient }))
+vi.mock('@clerk/nuxt/server', () => ({
+  clerkClient: () => ({ users: { createUser: mocks.clerkCreateUser } })
+}))
+
+vi.mock('../../server/utils/session', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/utils/session')>()
+  return {
+    ...actual,
+    verifyPassword: mocks.verifyPassword,
+    signSessionToken: mocks.signSessionToken
+  }
+})
+
+let db: ReturnType<typeof createDbMock>
+
+vi.mock('../../server/utils/db', () => ({
+  dbAll: (...args: unknown[]) => db.dbAll(...args as [string]),
+  dbOne: (...args: unknown[]) => db.dbOne(...args as [string]),
+  dbRun: (...args: unknown[]) => db.dbRun(...args as [string])
+}))
 
 vi.stubGlobal('defineEventHandler', <T>(callback: T) => callback)
-const signup = (await import('../../server/api/auth/signup.post')).default
+vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => {
+  const error = new Error(message) as Error & { statusCode: number }
+  error.statusCode = statusCode
+  return error
+})
+
 const login = (await import('../../server/api/auth/login.post')).default
 const logout = (await import('../../server/api/auth/logout.post')).default
 const me = (await import('../../server/api/auth/me.get')).default
-const setSession = (await import('../../server/api/auth/set-session.post')).default
 
 function expectHttpError(error: unknown, statusCode: number, message: string) {
   expect(error).toMatchObject({ statusCode, message })
 }
 
-function createAdmin({
-  user = { id: 'user-1', email: 'member@example.com' },
-  authError = null,
-  profileError = null
-}: {
-  user?: { id: string, email: string } | null
-  authError?: unknown
-  profileError?: unknown
-} = {}) {
-  const createUser = vi.fn(async () => ({ data: { user }, error: authError }))
-  const profileInsert = vi.fn(async () => ({ error: profileError }))
-
-  return {
-    auth: { admin: { createUser } },
-    from: vi.fn(() => ({ insert: profileInsert })),
-    createUser,
-    profileInsert
-  }
-}
-
-function createSignInClient({
-  session = { access_token: 'access-token' },
-  error = null
-}: {
-  session?: { access_token: string } | null
-  error?: unknown
-} = {}) {
-  const signInWithPassword = vi.fn(async () => ({ data: { session }, error }))
-  return { auth: { signInWithPassword }, signInWithPassword }
-}
-
-function createSessionClient({ user = { id: 'user-1' }, error = null }: { user?: { id: string } | null, error?: unknown } = {}) {
-  const getUser = vi.fn(async () => ({ data: { user }, error }))
-  return { auth: { getUser }, getUser }
-}
-
 describe('auth API endpoints', () => {
   beforeEach(() => {
-    vi.stubGlobal('defineEventHandler', <T>(callback: T) => callback)
-    vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => {
-      const error = new Error(message) as Error & { statusCode: number }
-      error.statusCode = statusCode
-      return error
-    })
+    db = createDbMock()
+    mocks.signSessionToken.mockReturnValue('signed-token')
     vi.stubGlobal('useRuntimeConfig', () => ({
-      public: { supabaseUrl: 'http://supabase.test', supabaseAnonKey: 'anon-key' }
+      public: { demoEmail: 'demo@churchos.my' },
+      jwtSecret: 'test-secret'
     }))
     vi.stubGlobal('getRequestHeader', (_event: unknown, name: string) => name === 'origin' ? 'https://app.churchos.test' : undefined)
     vi.stubGlobal('getRequestURL', () => new URL('https://app.churchos.test/api/auth/set-session'))
     vi.stubGlobal('setCookie', vi.fn())
     vi.stubGlobal('deleteCookie', vi.fn())
+    vi.stubGlobal('clientKey', () => 'test-key')
+    vi.stubGlobal('rateLimit', () => ({ allowed: true, remaining: 1, retryAfterSeconds: 0 }))
   })
 
   afterEach(() => {
@@ -77,44 +64,11 @@ describe('auth API endpoints', () => {
     vi.unstubAllGlobals()
   })
 
-  it('rejects signup requests without a valid password before calling Supabase', async () => {
-    vi.stubGlobal('readBody', async () => ({ email: 'member@example.com', password: 'short' }))
-
-    await expect(signup({} as never)).rejects.toSatisfy(error => {
-      expectHttpError(error, 400, 'Password must be at least 8 characters')
-      return true
-    })
-    expect(mocks.useSupabaseAdmin).not.toHaveBeenCalled()
-  })
-
-  it('creates a profile, signs in, and sets a protected session cookie on signup', async () => {
-    const admin = createAdmin()
-    const client = createSignInClient()
-    mocks.useSupabaseAdmin.mockReturnValue(admin)
-    mocks.createClient.mockReturnValue(client)
-    vi.stubGlobal('readBody', async () => ({
-      email: 'member@example.com', password: 'strong-password', displayName: 'Member'
-    }))
-
-    await expect(signup({} as never)).resolves.toEqual({ user: { id: 'user-1', email: 'member@example.com' } })
-    expect(admin.createUser).toHaveBeenCalledWith({
-      email: 'member@example.com',
-      password: 'strong-password',
-      email_confirm: true,
-      user_metadata: { display_name: 'Member' }
-    })
-    expect(admin.profileInsert).toHaveBeenCalledWith({
-      id: 'user-1', email: 'member@example.com', display_name: 'Member', preferred_language: 'en'
-    })
-    expect(client.signInWithPassword).toHaveBeenCalledWith({ email: 'member@example.com', password: 'strong-password' })
-    expect(globalThis.setCookie).toHaveBeenCalledWith(expect.anything(), '__session', 'access-token', expect.objectContaining({
-      httpOnly: true, sameSite: 'lax', maxAge: 604800, path: '/'
-    }))
-  })
-
-  it('does not create a session when login credentials are invalid', async () => {
-    const client = createSignInClient({ session: null, error: { message: 'Invalid login credentials' } })
-    mocks.createClient.mockReturnValue(client)
+  it('rejects login when credentials do not verify', async () => {
+    db.dbOne
+      .mockResolvedValueOnce({ id: 'user-1' }) // profiles lookup
+      .mockResolvedValueOnce({ password_hash: 'scrypt:salt:hash' }) // credential lookup
+    mocks.verifyPassword.mockResolvedValue(false)
     vi.stubGlobal('readBody', async () => ({ email: 'member@example.com', password: 'wrong-password' }))
 
     await expect(login({} as never)).rejects.toSatisfy(error => {
@@ -124,55 +78,28 @@ describe('auth API endpoints', () => {
     expect(globalThis.setCookie).not.toHaveBeenCalled()
   })
 
+  it('sets a signed session cookie on successful login', async () => {
+    db.dbOne
+      .mockResolvedValueOnce({ id: 'user-1' })
+      .mockResolvedValueOnce({ password_hash: 'scrypt:salt:hash' })
+    mocks.verifyPassword.mockResolvedValue(true)
+    vi.stubGlobal('readBody', async () => ({ email: 'member@example.com', password: 'correct-password' }))
+
+    await expect(login({} as never)).resolves.toEqual({ success: true })
+    expect(globalThis.setCookie).toHaveBeenCalledWith(expect.anything(), '__session', 'signed-token', expect.objectContaining({
+      httpOnly: true, sameSite: 'lax', maxAge: 604800, path: '/'
+    }))
+  })
+
   it('deletes the session cookie on logout', async () => {
     await expect(logout({ context: {} } as never)).resolves.toEqual({ success: true })
     expect(globalThis.deleteCookie).toHaveBeenCalledWith(expect.anything(), '__session', { path: '/' })
     expect(globalThis.deleteCookie).toHaveBeenCalledWith(expect.anything(), '__org_id', { path: '/' })
   })
 
-  it('stores a protected session cookie after client-side authentication', async () => {
-    const client = createSessionClient()
-    mocks.createClient.mockReturnValue(client)
-    vi.stubGlobal('readBody', async () => ({ accessToken: 'otp-access-token' }))
-
-    await expect(setSession({} as never)).resolves.toEqual({ success: true })
-    expect(client.getUser).toHaveBeenCalledWith('otp-access-token')
-    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).toHaveBeenCalledWith(expect.anything(), '__session', 'otp-access-token', expect.objectContaining({
-      httpOnly: true, sameSite: 'lax', maxAge: 604800, path: '/'
-    }))
-  })
-
-  it('rejects a missing access token before storing a session cookie', async () => {
-    vi.stubGlobal('readBody', async () => ({}))
-
-    await expect(setSession({} as never)).rejects.toSatisfy(error => {
-      expectHttpError(error, 400, 'Access token required')
-      return true
-    })
-    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
-  })
-
-  it('rejects a cross-origin request before validating or storing a session', async () => {
-    vi.stubGlobal('getRequestHeader', (_event: unknown, name: string) => name === 'origin' ? 'https://attacker.example' : undefined)
-    vi.stubGlobal('readBody', async () => ({ accessToken: 'attacker-access-token' }))
-
-    await expect(setSession({} as never)).rejects.toSatisfy(error => {
-      expectHttpError(error, 403, 'Invalid request origin')
-      return true
-    })
-    expect(mocks.createClient).not.toHaveBeenCalled()
-    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
-  })
-
-  it('rejects an invalid access token before storing a session cookie', async () => {
-    mocks.createClient.mockReturnValue(createSessionClient({ user: null, error: { message: 'Invalid JWT' } }))
-    vi.stubGlobal('readBody', async () => ({ accessToken: 'invalid-token' }))
-
-    await expect(setSession({} as never)).rejects.toSatisfy(error => {
-      expectHttpError(error, 401, 'Invalid session')
-      return true
-    })
-    expect((globalThis as unknown as { setCookie: ReturnType<typeof vi.fn> }).setCookie).not.toHaveBeenCalled()
+  it('deletes the demo org on logout from a demo sandbox', async () => {
+    await expect(logout({ context: { org: { id: 'org-demo', is_demo: true } } } as never)).resolves.toEqual({ success: true })
+    expect(db.dbRun).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM organizations'), ['org-demo'])
   })
 
   it('returns the current user and organization context from the middleware', async () => {
@@ -180,7 +107,7 @@ describe('auth API endpoints', () => {
       context: {
         user: {
           id: 'user-1', email: 'member@example.com', profile: { id: 'user-1' },
-          organizations: [{ roles: ['admin'], organizations: { id: 'org-1', slug: 'grace', name: 'Grace Church', subscription_status: 'inactive', is_demo: false } }]
+          organizations: [{ roles: ['admin'], status: 'active', organization_id: 'org-1', organizations: { id: 'org-1', slug: 'grace', name: 'Grace Church', subscription_status: 'inactive', is_demo: false } }]
         },
         org: { id: 'org-1', slug: 'grace' }
       }

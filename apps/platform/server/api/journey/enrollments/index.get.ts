@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbAll } from '../../../utils/db'
 
 /**
  * Lists enrollments for the current organization with track and member
@@ -8,26 +8,19 @@ import { useSupabaseAdmin } from '../../../utils/supabase'
 export default defineEventHandler(async (event) => {
   const org = requireModule(event, 'journey')
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('enrollments')
-    .select(`
-      id,
-      status,
-      enrolled_at,
-      completed_at,
-      tracks(title_en),
-      mentee:members!mentee_id(full_name),
-      mentor:members!mentor_id(full_name)
-    `)
-    .eq('organization_id', org.id)
-    .order('enrolled_at', { ascending: false })
+  const rows = await dbAll(
+    `SELECT e.id, e.status, e.enrolled_at, e.completed_at,
+            t.title_en AS track_title,
+            mentee.full_name AS mentee_name,
+            mentor.full_name AS mentor_name
+       FROM enrollments e
+       JOIN tracks t ON t.id = e.track_id
+       JOIN members mentee ON mentee.id = e.mentee_id
+       LEFT JOIN members mentor ON mentor.id = e.mentor_id
+      WHERE e.organization_id = ?
+      ORDER BY e.enrolled_at DESC`,
+    [org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to load enrollments'
-    })
-  }
-
-  return data ?? []
+  return rows
 })

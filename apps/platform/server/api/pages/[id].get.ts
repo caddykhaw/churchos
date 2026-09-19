@@ -1,5 +1,5 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne } from '../../utils/db'
 
 /** Returns a single website page of the current organization. */
 export default defineEventHandler(async (event) => {
@@ -10,19 +10,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Page id required' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('pages')
-    .select('*')
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .single()
+  const page = await dbOne(
+    'SELECT * FROM pages WHERE id = ? AND organization_id = ?',
+    [id, org.id]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 404,
-      message: 'Page not found'
-    })
+  if (!page) {
+    throw createError({ statusCode: 404, message: 'Page not found' })
   }
 
-  return data
+  return { ...page, published: Number(page.published) === 1 }
 })

@@ -9,12 +9,14 @@
     "preview": "nuxt preview",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "db:migrate": "node ../../scripts/migrate.mjs"
   },
   "dependencies": {
     "@churchos/database": "workspace:*",
+    "@clerk/nuxt": "^1.2.3",
+    "@libsql/client": "^0.14.0",
     "@stripe/stripe-js": "^9.14.0",
-    "@supabase/supabase-js": "^2.57.4",
     "nuxt": "4.5.2",
     "vue": "3.5.41",
     "vue-router": "^5.2.0"

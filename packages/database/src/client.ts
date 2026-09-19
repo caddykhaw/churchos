@@ -1,18 +1,12 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@libsql/client'
 
-export function createSupabaseClient(
-  supabaseUrl: string,
-  supabaseKey: string,
-  options?: any
-): SupabaseClient {
-  return createClient(supabaseUrl, supabaseKey, options)
-}
+export type LibsqlClient = ReturnType<typeof createClient>
 
-export function createSupabaseAdmin(supabaseUrl: string, serviceKey: string): SupabaseClient {
-  return createClient(supabaseUrl, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
+/**
+ * Creates a Turso/libSQL client.
+ * - Remote: url like libsql://<db>-<org>.turso.io + authToken (Workers-safe, fetch-based).
+ * - Local:  url like file:./local.db (used by tests / local dev).
+ */
+export function createTursoClient(url: string, authToken?: string): LibsqlClient {
+  return createClient({ url, authToken })
 }

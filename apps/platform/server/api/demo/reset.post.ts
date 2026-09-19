@@ -1,5 +1,6 @@
-import { provisionDemoSandbox, signInDemoUser } from '../../utils/demo'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { provisionDemoSandbox, ensureDemoProfile } from '../../utils/demo'
+import { signSessionToken } from '../../utils/session'
+import { dbRun } from '../../utils/db'
 import { clientKey, rateLimit } from '../../utils/rate-limit'
 
 const ORG_COOKIE = '__org_id'
@@ -24,15 +25,15 @@ export default defineEventHandler(async (event) => {
   const currentOrgId = getCookie(event, ORG_COOKIE)
 
   if (currentOrgId) {
-    const admin = useSupabaseAdmin()
     // Only delete orgs that are actually demo sandboxes.
-    await admin.from('organizations').delete().eq('id', currentOrgId).eq('is_demo', true)
+    await dbRun('DELETE FROM organizations WHERE id = ? AND is_demo = 1', [currentOrgId])
   }
 
   const org = await provisionDemoSandbox()
-  const accessToken = await signInDemoUser()
+  const demoProfileId = await ensureDemoProfile()
+  const token = signSessionToken({ userId: demoProfileId, demo: true })
 
-  setCookie(event, SESSION_COOKIE, accessToken, {
+  setCookie(event, SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

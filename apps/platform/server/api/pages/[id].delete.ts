@@ -1,5 +1,5 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne, dbRun } from '../../utils/db'
 
 /**
  * Deletes a website page of the current organization. Published pages must be
@@ -13,38 +13,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Page id required' })
   }
 
-  const supabase = useSupabaseAdmin()
-
-  const { data: page } = await supabase
-    .from('pages')
-    .select('id, published')
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .single()
+  const page = await dbOne(
+    'SELECT id, published FROM pages WHERE id = ? AND organization_id = ?',
+    [id, org.id]
+  )
 
   if (!page) {
     throw createError({ statusCode: 404, message: 'Page not found' })
   }
 
-  if (page.published) {
+  if (Number(page.published) === 1) {
     throw createError({
       statusCode: 409,
       message: 'Page is published. Unpublish it before deleting.'
     })
   }
 
-  const { error } = await supabase
-    .from('pages')
-    .delete()
-    .eq('id', id)
-    .eq('organization_id', org.id)
-
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to delete page'
-    })
-  }
+  await dbRun('DELETE FROM pages WHERE id = ? AND organization_id = ?', [id, org.id])
 
   return { ok: true }
 })

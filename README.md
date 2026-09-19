@@ -2,9 +2,9 @@
 
 Multi-tenant SaaS for Malaysian churches. Modular Church Management System (ChMS), Discipleship LMS, and People-centric website builder — all in one platform.
 
-- **Live:** `churchos.my` · `app.churchos.my` · `db.churchos.my`
+- **Live:** `churchos.my` · `app.churchos.my`
 - **GitHub:** [caddykhaw/churchos](https://github.com/caddykhaw/churchos) · `main` branch
-- **CI:** 41 tests passing ✅ · Lint + Typecheck + Build on every PR
+- **CI:** Lint + Typecheck + Tests + Build on every PR
 
 ---
 
@@ -15,14 +15,11 @@ Cloudflare Pages
 ├── churchos.my        → Marketing site (static, Nuxt 4)
 ├── www.churchos.my    → CNAME → churchos.my (Pages)
 ├── app.churchos.my    → CNAME → churchos-platform.pages.dev (platform SSR)
-├── *.churchos.my      → CNAME → churchos.my (tenant subdomains)
-├── db.churchos.my     → A → VPS :33001 (Supabase Studio, proxied)
+└── *.churchos.my      → CNAME → churchos.my (tenant subdomains)
 
-VPS (4 vCPU, 7.8 GB RAM) — self-hosted Supabase stack only
-├── PostgreSQL 15        (db service, host port 35432)
-├── PostgREST             (rest service, host port 38080)
-├── Supabase Studio       (studio, host port 33001)
-└── Nginx                 (nginx, host port 8088, reverse proxy)
+Managed services
+├── Turso (libSQL)     → primary database (libsql://churchos-....turso.io)
+└── Clerk              → authentication (email/password + social, OTP-capable)
 ```
 
 ### Stack
@@ -30,32 +27,32 @@ VPS (4 vCPU, 7.8 GB RAM) — self-hosted Supabase stack only
 | Layer | Technology |
 |---|---|
 | Application | Nuxt 4, Vue 3, TypeScript, Nitro (SSR) |
-| Identity | Supabase Auth (email/password) + shared demo account for the sandbox |
-| Database | PostgreSQL (self-hosted via Docker) |
-| Realtime | Supabase Realtime |
-| Storage | Supabase Storage |
+| Identity | Clerk (`@clerk/nuxt`) — sign-in/up components + Backend API |
+| Sessions | First-party HMAC-signed cookies (`__session`), 7-day TTL |
+| Database | Turso (libSQL/SQLite) via `@libsql/client` |
 | Hosting | Cloudflare Pages (platform + marketing) |
 | DNS | Cloudflare API (auto-provisioned tenant subdomains) |
 | Payments | Owner-activated plans (self-serve checkout not yet enabled) |
 | Email | Resend |
 | Package manager | pnpm workspaces (monorepo) |
 
+> **Migration note (2026-09):** ChurchOS moved off self-hosted Supabase (Docker on a VPS) to Turso + Clerk. The public Postgres port, GoTrue auth service, and manual backup burden are gone; tenant isolation is enforced server-side (scoped SQL + org-context middleware) instead of Postgres RLS.
+
 ### Multi-tenancy
 
-- **Isolation:** every table (except global lookups) carries `organization_id`; RLS policies enforce row-level isolation
-- **Context:** middleware resolves the current org from subdomain (`{slug}.churchos.my`), custom domain, or `X-Organization-ID` header
+- **Isolation:** every table (except global lookups) carries `organization_id`; all queries are scoped by the org-context middleware and API helpers
+- **Context:** middleware resolves the current org from subdomain (`{slug}.churchos.my`), custom domain, or `X-Organization-ID` header — membership is always verified server-side
 - **Authz:** server-side middleware (`01.session.ts`, `02.org-context.ts`) + helpers in `server/utils/auth.ts` (`requireAuth`, `requireOrg`, `requireRole`, `requireModule`)
 - **Subscription gating:** `requireModule` blocks module APIs; frontend gates via `hasModule()` composable
-- **Cross-org:** JOURNEY certificates are visible across orgs (users see own; admins see members' within their org)
 - **Subdomain rules:** `{slug}.churchos.my`, `^[a-z0-9-]{3,30}$`, reserved words: `app, www, api, admin, docs, blog, mail`
 
 ### Modules
 
-1. **PEOPLE** — ChMS (members, donations, events, groups, volunteers)
-2. **JOURNEY** — Discipleship LMS (tracks, enrollments, mentors, certificates)
-3. **PAGES** — People-centric church website builder (multilingual content, block editor)
+1. **PEOPLE** — ChMS (members)
+2. **JOURNEY** — Discipleship LMS (tracks, enrollments, mentors)
+3. **PAGES** — People-centric church website builder (multilingual content)
 
-Users can belong to multiple orgs and switch via a dropdown (header). JOURNEY certificates carry across organizations.
+Users can belong to multiple orgs and switch via a dropdown (header).
 
 ### Pricing (MYR, post-discount)
 
@@ -66,9 +63,9 @@ Users can belong to multiple orgs and switch via a dropdown (header). JOURNEY ce
 | PAGES | RM 79/mo (EN/ZH) | — | RM 79/mo + MS/TA |
 | **All-in-One** | RM 236/mo | RM 474/mo | RM 746/mo |
 
-All-in-One includes a free custom domain (1 year) and all languages. Workspaces are **activated when a plan is arranged** — there is no self-serve trial. Prospective churches can try the full product in the **public demo sandbox** (`app.churchos.my/auth/demo`): every visitor gets an isolated, pre-seeded workspace with all modules enabled, and the copy is deleted when they sign out.
+Workspaces are **activated when a plan is arranged** — there is no self-serve trial. Prospective churches can try the full product in the **public demo sandbox** (`app.churchos.my/auth/demo`): every visitor gets an isolated, pre-seeded workspace with all modules enabled, and the copy is deleted when they sign out.
 
-**Workspace lifecycle:** `inactive` (registered, waiting to be activated) → `active` → `suspended` / `cancelled`. Demo sandboxes are flagged `is_demo = true` and are never part of billing.
+**Workspace lifecycle:** `inactive` (registered, waiting to be activated) → `active` → `suspended` / `cancelled`. Demo sandboxes are flagged `is_demo = 1` and are never part of billing.
 
 ---
 
@@ -78,26 +75,16 @@ All-in-One includes a free custom domain (1 year) and all languages. Workspaces 
 churchos/
 ├── .github/workflows/
 │   ├── ci.yml                  # Lint, typecheck, test, build on PR/push
-│   └── platform-deploy.yml     # Deploy platform → Cloudflare Pages
+│   └── platform-deploy.yml     # Migrate + deploy platform → Cloudflare Pages
 ├── apps/
 │   ├── marketing/              # ChurchOS.my (lightweight, static landing)
 │   └── platform/               # Main SaaS (PEOPLE + JOURNEY + PAGES)
 ├── packages/
-│   ├── database/               # Supabase client factory + shared TS types
-│   ├── ui/                     # DOVES design-system Vue components
-│   ├── i18n/                   # EN/ZH/MS/TA translations
-│   ├── plugin-sdk/             # Plugin development kit
-│   └── utils/                  # Shared utilities
-├── supabase/
-│   └── migrations/             # Schema + RLS migrations
-├── docker/
-│   ├── docker-compose.yml      # Local self-hosted Supabase stack
-│   ├── nginx.conf              # Reverse proxy
-│   └── .env.example            # Docker secrets template
-├── docs/superpowers/
-│   ├── specs/                  # Design specifications
-│   └── plans/                  # Implementation plans
-└── wrangler.toml               # Cloudflare Pages config
+│   └── database/               # libSQL client factory + shared TS types
+├── migrations/                 # SQLite/libSQL schema migrations
+├── scripts/
+│   └── migrate.mjs             # Migration runner (Turso HTTP API)
+└── docs/superpowers/           # Specs, plans, audits
 ```
 
 ---
@@ -106,9 +93,8 @@ churchos/
 
 - Node `>=24.11.0 <25`
 - pnpm `11.19.0`
-- Docker (for the local Supabase stack)
-- Cloudflare account with the `churchos.my` zone configured for Pages
-- (CI/CD) GitHub secrets — see [Deployment](#deployment)
+- A Turso database (`turso db create churchos`)
+- A Clerk application (`clerk init --framework nuxt`)
 
 ---
 
@@ -122,69 +108,49 @@ nvm use 24        # or: fnm use 24
 pnpm install
 
 # 3. Configure environment
-cp .env.example .env
-# Edit .env with your local keys (see .env.example comments)
-# Local Supabase REST runs on http://localhost:38080
+cp .env.example apps/platform/.env
+# Fill in TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, Clerk keys, JWT_SECRET
+# (or run `clerk env pull` inside apps/platform for the Clerk keys)
 
-# 4. Start the local Supabase stack
-docker compose -f docker/docker-compose.yml up -d
+# 4. Apply migrations to Turso
+pnpm --filter platform db:migrate
 
 # 5. Run both apps (ports: platform :3008, marketing :3000)
 pnpm dev
 ```
 
-### Local services & ports
-
-| Service | Host port | Container |
-|---|---|---|
-| PostgreSQL | 35432 | 5432 |
-| PostgREST | 38080 | 3000 |
-| Studio | 33001 | 3000 |
-| Nginx | 8088 | 80 |
-| Platform dev | 3008 | — |
-| Marketing dev | 3000 | — |
-
-> Ports are shifted from the original plan to avoid collisions with other services on this host. Update `NUXT_PUBLIC_SUPABASE_URL` in `.env` to `http://localhost:38080` to match.
-
 ### Useful commands
 
 ```bash
-pnpm dev          # Start marketing + platform dev servers
-pnpm build          # Build all apps
-pnpm test           # Run all tests
+pnpm dev                        # Start marketing + platform dev servers
+pnpm build                      # Build all apps
+pnpm test                       # Run all tests
 pnpm lint && pnpm typecheck
-pnpm --filter platform dev     # Platform only
-pnpm --filter marketing dev    # Marketing only
-```
-
-### Docker secrets
-
-Generate strong secrets and save to `docker/.env` (never commit this file):
-
-```bash
-openssl rand -base64 32   # JWT_SECRET (32+)
-openssl rand -base64 32   # POSTGRES_PASSWORD (32+)
-# Get ANON_KEY + SERVICE_KEY from Supabase local studio → Settings → API
+pnpm --filter platform db:migrate   # Apply pending migrations to Turso
+turso db shell churchos         # Inspect the database
 ```
 
 ---
 
 ## Database
 
-Migrations live in `supabase/migrations/` (chronological, prefixed). Apply locally with:
+Migrations live in `migrations/` (chronological, prefixed). They are plain SQLite SQL, applied over Turso's HTTP API — **no database port is ever exposed to the internet**. The runner tracks applied files in `schema_migrations`, so it is safe to re-run.
 
 ```bash
-docker exec -i churchos-db psql -U postgres < supabase/migrations/20260824000001_initial_schema.sql
+node scripts/migrate.mjs   # requires TURSO_DATABASE_URL + TURSO_AUTH_TOKEN
 ```
 
 ### Current migrations
 
 | File | Description |
 |---|---|
-| `20260824000001_initial_schema.sql` | Core tables: `organizations`, `profiles`, `organization_members` + helpers (`current_org_id()`, `update_updated_at()`) |
-| `20260824000002_rls_policies.sql` | RLS policies for org-isolation + role-based writes |
-| `20260903000002_module_tables.sql` | Module tables: `members`, `tracks`, `enrollments`, `pages` |
-| `20260903000003_demo_and_inactive.sql` | `organizations.is_demo` flag; default status `inactive`; migrate legacy `trial` rows |
+| `0001_init.sql` | Full schema: `organizations`, `profiles`, `organization_members`, `members`, `tracks`, `enrollments`, `pages` + CHECK constraints and indexes |
+
+Conventions:
+- UUIDs are TEXT primary keys generated app-side (`crypto.randomUUID()`)
+- Booleans are stored as `0/1`; array-like columns are JSON strings
+- Status columns are guarded by `CHECK` constraints (DB-level enum integrity)
+- `updated_at` is set explicitly in UPDATE statements (no triggers over HTTP)
 
 ---
 
@@ -193,41 +159,36 @@ docker exec -i churchos-db psql -U postgres < supabase/migrations/20260824000001
 ### CI/CD (.github/workflows)
 
 - **`ci.yml`** — runs on PR + push to `main`: lint, typecheck, test, build.
-- **`platform-deploy.yml`** — on push to `main` (paths: `apps/platform/**`, `packages/**`, `supabase/**`):
-  1. `supabase db push --linked` (applies migrations to remote)
+- **`platform-deploy.yml`** — on push to `main` (paths: `apps/platform/**`, `packages/**`, `migrations/**`):
+  1. `node scripts/migrate.mjs` (applies pending migrations to Turso)
   2. `pnpm --filter platform build` (Cloudflare Pages preset)
-  3. Deploys `apps/platform/.output/public` → `churchos-platform` Pages project
+  3. Deploys `apps/platform/dist` → `churchos-platform` Pages project
 
 ### GitHub secrets required
 
 | Secret | Purpose |
 |---|---|
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI remote access |
-| `SUPABASE_PROJECT_REF` | Remote project reference |
-| `SUPABASE_URL` | Remote Supabase URL |
-| `SUPABASE_ANON_KEY` | Public anon key |
-| `SUPABASE_SERVICE_KEY` | Service role key (server-side only) |
+| `TURSO_DATABASE_URL` | libSQL URL (`libsql://...`) |
+| `TURSO_AUTH_TOKEN` | Turso database token |
+| `CLERK_PUBLISHABLE_KEY` | `pk_test_...` / `pk_live_...` |
+| `CLERK_SECRET_KEY` | Clerk Backend API key (server-side only) |
+| `JWT_SECRET` | Session cookie signing secret |
 | `CLOUDFLARE_API_TOKEN` | Pages deploy + DNS |
 | `CLOUDFLARE_ZONE_ID` | `churchos.my` zone |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
-| `CLOUDFLARE_PAGES_PROJECT` | `churchos-platform` |
-
-### Marketing site
-
-Deployed as a separate lightweight static site. The `wrangler.toml` configures `churchos-platform` Pages project with output dir `apps/platform/dist`.
 
 ---
 
 ## Testing
 
-The platform app ships with Vitest + `@nuxt/test-utils`:
+The platform app ships with Vitest:
 
 ```bash
 pnpm test          # all workspace tests
 pnpm --filter platform test  # platform only
 ```
 
-41 tests pass across the suite (auth, org context, module APIs, subscription gating, Cloudflare DNS helpers).
+Tests cover auth, demo sandbox lifecycle, module CRUD (people/journey/pages), organization creation, rate limiting, and the schema tenant-isolation contract.
 
 ---
 
@@ -235,7 +196,6 @@ pnpm --filter platform test  # platform only
 
 - [Multi-tenant design spec](docs/superpowers/specs/2026-08-24-churchos-multi-tenant-design.md)
 - [Foundation infrastructure plan](docs/superpowers/plans/2026-08-24-foundation-infrastructure.md)
-- [DOVES design system](packages/ui/)
 
 ---
 

@@ -100,7 +100,7 @@
                   <button
                     class="toggle"
                     role="switch"
-                    :aria-checked="page.published"
+                    :aria-checked="page.published ? 'true' : 'false'"
                     :aria-label="`${page.published ? 'Unpublish' : 'Publish'} ${page.title_en}`"
                     :class="{ 'toggle--on': page.published }"
                     :disabled="updatingId === page.id"
@@ -111,7 +111,7 @@
                   <button
                     class="btn btn-ghost btn-sm"
                     :aria-label="`Delete ${page.title_en}`"
-                    :disabled="updatingId === page.id || page.published"
+                    :disabled="updatingId === page.id || Boolean(page.published)"
                     @click="handleDelete(page)"
                   >
                     Delete

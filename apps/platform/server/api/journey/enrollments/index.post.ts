@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbOne, dbRun } from '../../../utils/db'
 
 /** Enrolls a member into a discipleship track (admin action). */
 export default defineEventHandler(async (event) => {
@@ -17,38 +17,30 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const supabase = useSupabaseAdmin()
-
   // Both rows must belong to this org — scoped lookups double as isolation checks.
-  const { data: track } = await supabase
-    .from('tracks')
-    .select('id, prerequisite_track_id, status')
-    .eq('id', trackId)
-    .eq('organization_id', org.id)
-    .single()
+  const track = await dbOne(
+    'SELECT id, prerequisite_track_id, status FROM tracks WHERE id = ? AND organization_id = ?',
+    [trackId, org.id]
+  )
 
   if (!track) {
     throw createError({ statusCode: 404, message: 'Track not found' })
   }
 
-  const { data: mentee } = await supabase
-    .from('members')
-    .select('id')
-    .eq('id', menteeId)
-    .eq('organization_id', org.id)
-    .single()
+  const mentee = await dbOne(
+    'SELECT id FROM members WHERE id = ? AND organization_id = ?',
+    [menteeId, org.id]
+  )
 
   if (!mentee) {
     throw createError({ statusCode: 404, message: 'Member not found' })
   }
 
   if (mentorId) {
-    const { data: mentor } = await supabase
-      .from('members')
-      .select('id')
-      .eq('id', mentorId)
-      .eq('organization_id', org.id)
-      .single()
+    const mentor = await dbOne(
+      'SELECT id FROM members WHERE id = ? AND organization_id = ?',
+      [mentorId, org.id]
+    )
 
     if (!mentor) {
       throw createError({ statusCode: 404, message: 'Mentor not found' })
@@ -59,16 +51,14 @@ export default defineEventHandler(async (event) => {
   // the mentee has no completed enrollment for it in this org.
   const prerequisiteTrackId = track.prerequisite_track_id as string | null
   if (prerequisiteTrackId) {
-    const { data: completed } = await supabase
-      .from('enrollments')
-      .select('id')
-      .eq('organization_id', org.id)
-      .eq('track_id', prerequisiteTrackId)
-      .eq('mentee_id', menteeId)
-      .eq('status', 'completed')
-      .limit(1)
+    const completed = await dbOne(
+      `SELECT id FROM enrollments
+        WHERE organization_id = ? AND track_id = ? AND mentee_id = ? AND status = 'completed'
+        LIMIT 1`,
+      [org.id, prerequisiteTrackId, menteeId]
+    )
 
-    if (!completed || completed.length === 0) {
+    if (!completed) {
       throw createError({
         statusCode: 409,
         message: 'Mentee must complete the prerequisite track first'
@@ -77,40 +67,26 @@ export default defineEventHandler(async (event) => {
   }
 
   // Prevent duplicate active enrollments in the same track.
-  const { data: existing } = await supabase
-    .from('enrollments')
-    .select('id')
-    .eq('organization_id', org.id)
-    .eq('track_id', trackId)
-    .eq('mentee_id', menteeId)
-    .eq('status', 'active')
-    .limit(1)
+  const existing = await dbOne(
+    `SELECT id FROM enrollments
+      WHERE organization_id = ? AND track_id = ? AND mentee_id = ? AND status = 'active'
+      LIMIT 1`,
+    [org.id, trackId, menteeId]
+  )
 
-  if (existing && existing.length > 0) {
+  if (existing) {
     throw createError({
       statusCode: 409,
       message: 'Member is already enrolled in this track'
     })
   }
 
-  const { data, error } = await supabase
-    .from('enrollments')
-    .insert({
-      organization_id: org.id,
-      track_id: trackId,
-      mentee_id: menteeId,
-      mentor_id: mentorId,
-      status: 'active'
-    })
-    .select()
-    .single()
+  const id = crypto.randomUUID()
+  await dbRun(
+    `INSERT INTO enrollments (id, organization_id, track_id, mentee_id, mentor_id, status)
+     VALUES (?, ?, ?, ?, ?, 'active')`,
+    [id, org.id, trackId, menteeId, mentorId]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to enroll member'
-    })
-  }
-
-  return data
+  return await dbOne('SELECT * FROM enrollments WHERE id = ?', [id])
 })

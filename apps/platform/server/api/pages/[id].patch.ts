@@ -1,5 +1,5 @@
 import { requireModule } from '../../utils/auth'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { dbOne, dbRun } from '../../utils/db'
 
 const PAGE_TITLE_FIELDS = ['title_en', 'title_zh', 'title_ms', 'title_ta'] as const
 
@@ -36,28 +36,34 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body?.published !== undefined) {
-    patch.published = Boolean(body.published)
+    patch.published = body.published ? 1 : 0
   }
 
   if (Object.keys(patch).length === 0) {
     throw createError({ statusCode: 400, message: 'Nothing to update' })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('pages')
-    .update(patch)
-    .eq('id', id)
-    .eq('organization_id', org.id)
-    .select()
-    .single()
+  const setClause = Object.keys(patch).map((key) => `${key} = ?`).join(', ')
 
-  if (error) {
+  let rowsAffected: number
+  try {
+    rowsAffected = await dbRun(
+      `UPDATE pages SET ${setClause}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE id = ? AND organization_id = ?`,
+      [...Object.values(patch), id, org.id]
+    )
+  } catch (error) {
     // Unique violation on (organization_id, slug) or missing row.
-    throw createError({
-      statusCode: 409,
-      message: 'Page not found, or a page with that slug already exists'
-    })
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      throw createError({ statusCode: 409, message: 'A page with that slug already exists' })
+    }
+    throw error
   }
 
-  return data
+  if (rowsAffected === 0) {
+    throw createError({ statusCode: 404, message: 'Page not found' })
+  }
+
+  const page = await dbOne('SELECT * FROM pages WHERE id = ?', [id])
+  return page ? { ...page, published: Number(page.published) === 1 } : null
 })

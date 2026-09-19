@@ -11,7 +11,9 @@ import type { H3Event } from 'h3'
  *      user's first active membership — so a signed-in user always has an
  *      org context even before tenant subdomains are provisioned.
  *
- * Only active memberships are considered.
+ * Only active memberships are considered. Membership is verified against the
+ * server-side session state — a client-supplied org id is accepted only when
+ * an active membership exists for it.
  */
 export default defineEventHandler(async (event) => {
   if (!event.context.user) {
@@ -29,17 +31,13 @@ export default defineEventHandler(async (event) => {
   if (orgHeader) {
     orgId = orgHeader
   } else {
-    const admin = useSupabaseAdmin()
-
-    const { data: orgByDomain } = await admin
-      .from('organizations')
-      .select('id')
-      .eq('custom_domain', hostname)
-      .eq('custom_domain_verified', true)
-      .single()
+    const orgByDomain = await dbOne(
+      'SELECT id FROM organizations WHERE custom_domain = ? AND custom_domain_verified = 1',
+      [hostname]
+    )
 
     if (orgByDomain) {
-      orgId = orgByDomain.id
+      orgId = String(orgByDomain.id)
     } else {
       const labels = hostname.split('.')
       const isPlatformHost = labels.length <= 1
@@ -48,13 +46,8 @@ export default defineEventHandler(async (event) => {
         || labels[0] === 'localhost'
 
       if (!isPlatformHost) {
-        const { data: orgBySlug } = await admin
-          .from('organizations')
-          .select('id')
-          .eq('slug', labels[0])
-          .single()
-
-        if (orgBySlug) orgId = orgBySlug.id
+        const orgBySlug = await dbOne('SELECT id FROM organizations WHERE slug = ?', [labels[0]])
+        if (orgBySlug) orgId = String(orgBySlug.id)
       } else {
         // Platform host: fall back to a stored selection or the first membership.
         fromPlatformFallback = true
@@ -73,10 +66,10 @@ export default defineEventHandler(async (event) => {
       )
       orgId = selected?.organization_id ?? null
     } else if (!isDemoAccount) {
-      // Non-demo users fall back to their first active membership so a signed-in
-      // user always has an org context. The shared demo account must NOT fall
-      // back to an arbitrary sandbox — each visitor's sandbox is chosen via the
-      // __org_id cookie set by the demo entry flow.
+      // Non-demo users fall back to their first active membership. The shared
+      // demo account must NOT fall back to an arbitrary sandbox — each
+      // visitor's sandbox is chosen via the __org_id cookie set by the demo
+      // entry flow.
       const memberships = event.context.user.organizations.filter(
         (membership) => membership.status === 'active'
       )

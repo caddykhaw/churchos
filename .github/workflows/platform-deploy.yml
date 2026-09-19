@@ -6,7 +6,8 @@ on:
     paths:
       - 'apps/platform/**'
       - 'packages/**'
-      - 'supabase/**'
+      - 'migrations/**'
+      - 'scripts/**'
   workflow_dispatch:
 
 jobs:
@@ -27,42 +28,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Self-hosted Supabase: apply migrations straight to Postgres.
-      # DATABASE_URL must point at the publicly reachable Postgres port
-      # (e.g. postgres://postgres:<pass>@<host>:35432/postgres).
-      # Applied files are tracked in schema_migrations so re-runs skip them
-      # (the .sql files themselves are not idempotent).
-      - name: Apply migrations to self-hosted Supabase
+      # Turso (libSQL): apply pending migrations from migrations/ directly over
+      # the libSQL HTTP API. Applied files are tracked in schema_migrations so
+      # re-runs skip them. The token is a scoped database credential — no open
+      # network port is ever exposed.
+      - name: Apply migrations to Turso
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          docker run --rm -i postgres:15.6 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          CREATE TABLE IF NOT EXISTS schema_migrations (
-            filename TEXT PRIMARY KEY,
-            applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-          SQL
-          for migration in supabase/migrations/*.sql; do
-            name=$(basename "$migration")
-            applied=$(docker run --rm -i postgres:15.6 psql "$DATABASE_URL" -tAc \
-              "SELECT 1 FROM schema_migrations WHERE filename = '$name'")
-            if [ "$applied" = "1" ]; then
-              echo "Skipping $name (already applied)"
-              continue
-            fi
-            echo "Applying $name"
-            docker run --rm -i postgres:15.6 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-              < "$migration" || exit 1
-            docker run --rm -i postgres:15.6 psql "$DATABASE_URL" \
-              -c "INSERT INTO schema_migrations (filename) VALUES ('$name')" || exit 1
-          done
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: node scripts/migrate.mjs
 
       - name: Build
         run: pnpm --filter platform build
         env:
-          NUXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NUXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          NUXT_SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NUXT_CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

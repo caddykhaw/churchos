@@ -1,5 +1,5 @@
 import { requireModule } from '../../../utils/auth'
-import { useSupabaseAdmin } from '../../../utils/supabase'
+import { dbOne, dbRun } from '../../../utils/db'
 
 /** Creates a discipleship track for the current organization. */
 export default defineEventHandler(async (event) => {
@@ -14,24 +14,19 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { data, error } = await useSupabaseAdmin()
-    .from('tracks')
-    .insert({
-      organization_id: org.id,
-      title_en: titleEn,
-      title_zh: typeof body?.title_zh === 'string' ? body.title_zh.trim() || null : null,
-      description: typeof body?.description === 'string' ? body.description.trim() || null : null,
-      status: body?.status === 'published' ? 'published' : 'draft'
-    })
-    .select()
-    .single()
+  const id = crypto.randomUUID()
+  await dbRun(
+    `INSERT INTO tracks (id, organization_id, title_en, title_zh, description, status)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      org.id,
+      titleEn,
+      typeof body?.title_zh === 'string' ? body.title_zh.trim() || null : null,
+      typeof body?.description === 'string' ? body.description.trim() || null : null,
+      body?.status === 'published' ? 'published' : 'draft'
+    ]
+  )
 
-  if (error) {
-    throw createError({
-      statusCode: 500,
-      message: 'Failed to create track'
-    })
-  }
-
-  return data
+  return await dbOne('SELECT * FROM tracks WHERE id = ?', [id])
 })

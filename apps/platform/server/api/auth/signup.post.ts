@@ -1,18 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-import { useSupabaseAdmin } from '../../utils/supabase'
+import { clerkClient } from '@clerk/nuxt/server'
+import { dbRun, dbOne } from '../../utils/db'
+import { signSessionToken } from '../../utils/session'
 
 const SESSION_COOKIE = '__session'
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
-
-function setSessionCookie(event: Parameters<typeof setCookie>[0], accessToken: string) {
-  setCookie(event, SESSION_COOKIE, accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: SESSION_MAX_AGE_SECONDS,
-    path: '/'
-  })
-}
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ email?: unknown, password?: unknown, displayName?: unknown }>(event)
@@ -30,35 +21,44 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Password must be at least 8 characters' })
   }
 
-  const admin = useSupabaseAdmin()
-  const { data: authData, error: authError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { display_name: displayName }
-  })
-
-  if (authError || !authData.user) {
-    throw createError({ statusCode: 400, message: authError?.message || 'Failed to create user' })
+  const config = useRuntimeConfig()
+  if (email.toLowerCase() === String(config.public.demoEmail || '').toLowerCase()) {
+    throw createError({ statusCode: 400, message: 'This email is reserved' })
   }
 
-  const { error: profileError } = await admin
-    .from('profiles')
-    .insert({ id: authData.user.id, email, display_name: displayName, preferred_language: 'en' })
+  // Credentials are owned by Clerk; the local profile row is created here.
+  // Note: Clerk will surface its own validation errors (invalid email, etc.).
+  let clerkUser
+  try {
+    clerkUser = await clerkClient(event).users.createUser({
+      emailAddress: [email],
+      password,
+      firstName: displayName,
+      skipPasswordChecks: false
+    })
+  } catch (err: unknown) {
+    const message = err instanceof Error && 'message' in err ? err.message : ''
+    throw createError({ statusCode: 400, message: message || 'Failed to create user' })
+  }
 
-  if (profileError) {
+  await dbRun(
+    `INSERT INTO profiles (id, email, display_name) VALUES (?, ?, ?)
+     ON CONFLICT(id) DO NOTHING`,
+    [clerkUser.id, email, displayName]
+  )
+
+  const profile = await dbOne('SELECT id FROM profiles WHERE id = ?', [clerkUser.id])
+  if (!profile) {
     throw createError({ statusCode: 500, message: 'Failed to create user profile' })
   }
 
-  const config = useRuntimeConfig()
-  const supabase = createClient(config.public.supabaseUrl, config.public.supabaseAnonKey)
-  const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+  setCookie(event, SESSION_COOKIE, signSessionToken({ userId: clerkUser.id }), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    path: '/'
+  })
 
-  if (signInError || !sessionData.session) {
-    throw createError({ statusCode: 500, message: 'User created but sign-in failed' })
-  }
-
-  setSessionCookie(event, sessionData.session.access_token)
-
-  return { user: { id: authData.user.id, email } }
+  return { user: { id: clerkUser.id, email } }
 })
