@@ -28,7 +28,7 @@ export function signSessionToken(payload: Record<string, unknown>): string {
   return `${body}.${sig}`
 }
 
-export function verifySessionToken(token: string): { userId: string } | null {
+export function verifySessionToken(token: string): { userId: string, demo: boolean } | null {
   const [body, sig] = token.split('.')
   if (!body || !sig) return null
   const expected = createHmac('sha256', sessionSecret()).update(body).digest()
@@ -42,9 +42,9 @@ export function verifySessionToken(token: string): { userId: string } | null {
     return null
   }
   try {
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { exp?: number, userId?: string }
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { exp?: number, userId?: string, demo?: boolean }
     if (!payload.userId || typeof payload.exp !== 'number' || payload.exp < Date.now()) return null
-    return { userId: payload.userId }
+    return { userId: payload.userId, demo: payload.demo === true }
   } catch {
     return null
   }

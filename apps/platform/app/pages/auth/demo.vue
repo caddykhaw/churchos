@@ -20,14 +20,10 @@
 
       <div v-if="error" class="form-error" role="alert">{{ error }}</div>
 
-      <div class="demo-creds" role="group" aria-label="Demo credentials">
+      <div class="demo-creds" role="note" aria-label="How the demo works">
         <div class="demo-creds__row">
-          <span class="demo-creds__label">Email</span>
-          <code class="demo-creds__value">{{ config.public.demoEmail }}</code>
-        </div>
-        <div class="demo-creds__row">
-          <span class="demo-creds__label">Password</span>
-          <code class="demo-creds__value">{{ config.public.demoPassword }}</code>
+          <span class="demo-creds__label">No sign-up needed</span>
+          <span class="demo-creds__value">One click provisions your own private sandbox.</span>
         </div>
       </div>
 
@@ -52,7 +48,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: false })
 
-const config = useRuntimeConfig()
 const loading = ref(false)
 const error = ref('')
 
