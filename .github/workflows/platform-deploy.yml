@@ -65,25 +65,32 @@ jobs:
           DEMO_EMAIL: demo@churchos.my
         run: |
           PAYLOAD=$(node -e '
-            const env = {
+            const env = {}
+            for (const [key, value] of Object.entries({
               TURSO_DATABASE_URL: process.env.TURSO_DATABASE_URL,
               TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN,
               NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
               NUXT_CLERK_SECRET_KEY: process.env.NUXT_CLERK_SECRET_KEY,
               JWT_SECRET: process.env.JWT_SECRET,
               DEMO_EMAIL: process.env.DEMO_EMAIL
+            })) {
+              env[key] = { type: "plain_text", value }
             }
-            console.log(JSON.stringify({ deployment_configs: { preview: { env }, production: { env } } }))
+            console.log(JSON.stringify(env))
           ')
-          HTTP=$(curl -sS -o /tmp/cf-patch.json -w "%{http_code}" \
-            -X PATCH \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/churchos-platform" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "${PAYLOAD}")
-          echo "Cloudflare API responded ${HTTP}"
-          cat /tmp/cf-patch.json | head -c 400; echo
-          [ "$HTTP" = "200" ] || { echo 'Failed to sync Pages env vars'; exit 1; }
+          # Purpose-built endpoint: updates ONLY the env bindings for each
+          # environment (PATCH on the project would replace deployment_configs).
+          for ENVIRONMENT in production preview; do
+            HTTP=$(curl -sS -o /tmp/cf-env-$ENVIRONMENT.json -w "%{http_code}" \
+              -X PATCH \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/churchos-platform/environment/${ENVIRONMENT}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "${PAYLOAD}")
+            echo "${ENVIRONMENT}: Cloudflare API responded ${HTTP}"
+            head -c 300 /tmp/cf-env-$ENVIRONMENT.json; echo
+            [ "$HTTP" = "200" ] || { echo "Failed to sync ${ENVIRONMENT} env vars"; exit 1; }
+          done
 
       # cloudflare/pages-action bundles wrangler v2, whose direct uploads
       # fail Cloudflare's deploy stage; deploy with current wrangler instead.
