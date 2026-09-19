@@ -11,7 +11,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Detach demo.churchos.my from Pages and delete DNS record
+      - name: Diagnose and remove demo.churchos.my
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -20,27 +20,53 @@ jobs:
           set -euo pipefail
           DOMAIN=demo.churchos.my
           API=https://api.cloudflare.com/client/v4
+          AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
 
-          # Remove the custom domain from the known Pages projects.
-          for PROJECT in churchos-platform churchos-marketing; do
+          # --- 1. Where is the domain attached? List all Pages projects + domains.
+          echo "=== Pages projects and their custom domains ==="
+          PAGES_JSON=$(curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=50")
+          echo "$PAGES_JSON" | jq -r '.result[] | "\(.name): \(.domains // [] | join(", "))"'
+          PAGES_IDS=$(echo "$PAGES_JSON" | jq -r '.result[].name')
+
+          # Detach from every Pages project that lists the domain.
+          for PROJECT in $PAGES_IDS; do
             STATUS=$(curl -s -o /tmp/dom.json -w '%{http_code}' -X DELETE \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "$AUTH" \
               "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/domains/$DOMAIN")
-            echo "Pages '$PROJECT' delete -> HTTP $STATUS: $(cat /tmp/dom.json | head -c 200)"
+            echo "Pages '$PROJECT' delete -> HTTP $STATUS: $(head -c 200 /tmp/dom.json)"
           done
 
-          # Delete the DNS record(s) for the domain in the zone.
-          LIST=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+          # --- 2. Workers custom domains (deleting these removes their DNS record too).
+          echo "=== Workers custom domains matching $DOMAIN ==="
+          WD_JSON=$(curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains?hostname=$DOMAIN&per_page=50")
+          echo "$WD_JSON" | head -c 400; echo
+          WD_IDS=$(echo "$WD_JSON" | jq -r '.result[].id // empty')
+          for ID in $WD_IDS; do
+            DEL=$(curl -s -w '%{http_code}' -o /tmp/wdel.json -X DELETE \
+              -H "$AUTH" \
+              "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains/$ID")
+            echo "Workers domain $ID delete -> HTTP $DEL: $(head -c 200 /tmp/wdel.json)"
+          done
+
+          # --- 3. DNS records (token may lack Zone.DNS — report honestly).
+          echo "=== DNS records for $DOMAIN ==="
+          LIST=$(curl -s -w '\n%{http_code}' -H "$AUTH" \
             "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$DOMAIN&per_page=50")
           CODE=$(echo "$LIST" | tail -1)
           BODY=$(echo "$LIST" | sed '$d')
           echo "DNS list -> HTTP $CODE: $(echo "$BODY" | head -c 300)"
-          IDS=$(echo "$BODY" | jq -r '.result[].id // empty')
-          for ID in $IDS; do
-            DEL=$(curl -s -w '%{http_code}' -X DELETE -o /tmp/del.json \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records/$ID")
-            echo "Deleted DNS record $ID -> HTTP $DEL: $(head -c 200 /tmp/del.json)"
-          done
+          if [ "$CODE" = "200" ]; then
+            IDS=$(echo "$BODY" | jq -r '.result[].id // empty')
+            for ID in $IDS; do
+              DEL=$(curl -s -w '%{http_code}' -o /tmp/del.json -X DELETE \
+                -H "$AUTH" \
+                "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records/$ID")
+              echo "Deleted DNS record $ID -> HTTP $DEL: $(head -c 200 /tmp/del.json)"
+            done
+          else
+            echo "!! Token cannot access DNS (HTTP $CODE). Delete the record manually in"
+            echo "!! Cloudflare dashboard -> churchos.my -> DNS, or re-run with a token"
+            echo "!! that includes Zone:DNS:Edit."
+          fi
 
-          echo "Cleanup complete."
+          echo "Cleanup pass complete."
