@@ -32,7 +32,7 @@ jobs:
 
           # --- 2. List ALL Pages projects raw (to see auth status and every domain).
           echo "=== Raw Pages projects list ==="
-          curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=50" | head -c 1500; echo
+          curl -s -H "$AUTH" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" | head -c 2500; echo
 
           # --- 3. Workers custom domains for the hostname (deleting removes its DNS too).
           echo "=== Workers domains raw ==="
