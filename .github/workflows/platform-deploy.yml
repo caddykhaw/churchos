@@ -63,6 +63,8 @@ jobs:
           NUXT_CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DEMO_EMAIL: demo@churchos.my
+          NUXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+          NUXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
         run: |
           PAYLOAD=$(node -e '
             const env = {}
@@ -72,7 +74,9 @@ jobs:
               NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
               NUXT_CLERK_SECRET_KEY: process.env.NUXT_CLERK_SECRET_KEY,
               JWT_SECRET: process.env.JWT_SECRET,
-              DEMO_EMAIL: process.env.DEMO_EMAIL
+              DEMO_EMAIL: process.env.DEMO_EMAIL,
+              NUXT_PUBLIC_CLERK_SIGN_IN_URL: process.env.NUXT_PUBLIC_CLERK_SIGN_IN_URL,
+              NUXT_PUBLIC_CLERK_SIGN_UP_URL: process.env.NUXT_PUBLIC_CLERK_SIGN_UP_URL
             })) {
               env[key] = { type: "plain_text", value }
             }
@@ -91,6 +95,30 @@ jobs:
             head -c 300 /tmp/cf-env-$ENVIRONMENT.json; echo
             [ "$HTTP" = "200" ] || { echo "Failed to sync ${ENVIRONMENT} env vars"; exit 1; }
           done
+
+      # Confirm the bindings actually landed before deploying (values masked).
+      - name: Verify Pages project env bindings
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sS \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/churchos-platform" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" > /tmp/cf-project.json
+          node -e '
+            const project = JSON.parse(require("fs").readFileSync("/tmp/cf-project.json", "utf8")).result
+            const prod = project.deployment_configs?.production ?? {}
+            const keys = Object.keys(prod.env_vars ?? {})
+            console.log("production env_vars:", keys.join(", ") || "(none)")
+            console.log("production compatibility_date:", prod.compatibility_date ?? "(project default)")
+            console.log("production compatibility_flags:", JSON.stringify(prod.compatibility_flags ?? []))
+            const required = ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN", "NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "NUXT_CLERK_SECRET_KEY", "JWT_SECRET"]
+            const missing = required.filter((key) => !keys.includes(key))
+            if (missing.length) {
+              console.error("MISSING ENV BINDINGS:", missing.join(", "))
+              process.exit(1)
+            }
+          '
 
       # cloudflare/pages-action bundles wrangler v2, whose direct uploads
       # fail Cloudflare's deploy stage; deploy with current wrangler instead.
